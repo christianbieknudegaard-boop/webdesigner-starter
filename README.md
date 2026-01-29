@@ -1,3 +1,23 @@
+# Webdesign Builder
+
+En kraftig og brukervennlig webdesign-applikasjon som lar deg lage profesjonelle hjemmesider på minutter.
+
+## 🚀 Funksjoner
+
+- **Visuell redigering**: Live forhåndsvisning mens du bygger
+- **Responsivt design**: Fungerer perfekt på alle enheter
+- **Fargetilpasning**: Velg dine egne primær- og sekundærfarger
+- **Seksjonsbasert**: Hero, Om oss, Tjenester og Kontakt-seksjoner
+- **Eksport**: Last ned som HTML eller JSON-konfigurasjon
+- **Vercel-klar**: Enkel deployment til Vercel
+
+## 🛠️ Teknologi
+
+- **Next.js 15** - React-rammeverk
+- **TypeScript** - Type-sikkerhet
+- **Tailwind CSS** - Styling
+- **React** - UI-komponenter
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
