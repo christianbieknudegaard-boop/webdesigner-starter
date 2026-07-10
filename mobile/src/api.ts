@@ -49,3 +49,32 @@ export async function fetchListings(query?: string): Promise<Listing[]> {
   const data = (await res.json()) as { listings: Listing[] };
   return data.listings;
 }
+
+/** Bok fra katalogen/Google Books, til autoutfylling i selg-flyten. */
+export interface CatalogBook {
+  isbn: string;
+  title: string;
+  author: string;
+  category?: string;
+  originalPrice?: number;
+}
+
+/** Slår opp en bok via ISBN (fra strekkode eller tastet inn). */
+export async function lookupIsbn(isbn: string): Promise<CatalogBook | null> {
+  const url = new URL("/api/bokdata", BASE_URL);
+  url.searchParams.set("isbn", isbn);
+  const res = await fetch(url.toString());
+  if (!res.ok) return null;
+  const data = (await res.json()) as { book: CatalogBook | null };
+  return data.book;
+}
+
+/** Tekstsøk i bokkatalogen (tittel, forfatter eller ISBN). */
+export async function searchCatalog(query: string): Promise<CatalogBook[]> {
+  const url = new URL("/api/bokdata", BASE_URL);
+  url.searchParams.set("q", query);
+  const res = await fetch(url.toString());
+  if (!res.ok) return [];
+  const data = (await res.json()) as { books: CatalogBook[] };
+  return data.books;
+}

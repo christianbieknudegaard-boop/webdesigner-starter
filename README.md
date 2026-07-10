@@ -19,6 +19,8 @@ nettleseren («Legg til på hjemskjerm»).
 - 📚 Bla i annonser med tilstand, pris og «du sparer»-prosent
 - 📄 Annonsedetaljer med selgerinfo, vurdering og relaterte bøker
 - 🏷️ «Selg en bok»-flyt med prisveiledning per tilstand
+- 📷 Strekkodeskanning (ISBN) og tekstsøk som autoutfyller bokdetaljene
+  når du skal selge – med Google Books som reserve for ukjente ISBN
 - 👤 Min side med aktive annonser, solgte bøker og statistikk
 - 🔌 REST-API (`/api/listings`) som mobilappen bruker
 - 📱 Mobilapp med Hjem (søk/liste), Selg og Min side
@@ -69,6 +71,7 @@ mobile/         Expo-appen
 3. **Betaling** – Vipps/Stripe med pengene i forvaring til levert bok
 4. **Frakt** – ferdig frankert etikett via Posten/Helthjem-API
 5. **Bilder** – opplasting av ekte bokbilder (erstatter fargeomslagene)
-6. **ISBN-oppslag** – autoutfylling av tittel/forfatter fra ISBN
+6. **Bokkatalog** – utvid `lib/catalog.ts` til en ekte bokdatabase
+   (f.eks. Bokbasen) i stedet for demodata + Google Books
 7. **Meldinger** – chat mellom kjøper og selger
 8. **App-butikkene** – bygg og publiser Expo-appen via EAS

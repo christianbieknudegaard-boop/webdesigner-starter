@@ -8,6 +8,14 @@
     "userInterfaceStyle": "light",
     "backgroundColor": "#faf7f2",
     "primaryColor": "#2f5d50",
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Bokfink bruker kameraet til å skanne strekkoden på bøker du vil selge."
+        }
+      ]
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "no.bokfink.app"
