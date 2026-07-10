@@ -24,6 +24,7 @@ model Seller {
   purchases    Order[]        @relation("BuyerOrders")
   conversations Conversation[] @relation("BuyerConversations")
   messages     Message[]
+  reports      Report[]
 }
 
 model Session {
@@ -54,8 +55,25 @@ model Listing {
   sellerId      String
   order         Order?
   conversations Conversation[]
+  reports       Report[]
 
   @@index([category, sold])
+}
+
+// Rapportering av annonser (svindel, feil informasjon osv.).
+// Håndteres manuelt i databasen til et admin-panel er på plass.
+model Report {
+  id         String   @id @default(cuid())
+  listing    Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  listingId  String
+  reporter   Seller   @relation(fields: [reporterId], references: [id])
+  reporterId String
+  reason     String
+  comment    String   @default("")
+  resolved   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@unique([listingId, reporterId])
 }
 
 // Samtale om en annonse mellom en interessent ("buyer") og selgeren.

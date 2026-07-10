@@ -133,6 +133,20 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
             : "Opprett konto"}
       </button>
 
+      {mode === "register" && (
+        <p className="text-center text-xs text-muted">
+          Ved å opprette konto godtar du{" "}
+          <Link href="/vilkar" className="underline hover:text-brand-dark">
+            brukervilkårene
+          </Link>{" "}
+          og{" "}
+          <Link href="/personvern" className="underline hover:text-brand-dark">
+            personvernerklæringen
+          </Link>
+          .
+        </p>
+      )}
+
       <p className="text-center text-sm text-muted">
         {mode === "login" ? (
           <>

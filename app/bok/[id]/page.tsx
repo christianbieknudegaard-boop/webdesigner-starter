@@ -5,6 +5,7 @@ import BuyButton from "@/components/BuyButton";
 import ListingCard from "@/components/ListingCard";
 import ManageListing from "@/components/ManageListing";
 import MessageSellerButton from "@/components/MessageSellerButton";
+import ReportListingButton from "@/components/ReportListingButton";
 import { getCurrentSeller } from "@/lib/auth";
 import { getListing, searchListings } from "@/lib/data";
 import { SHIPPING_PRICE } from "@/lib/orders";
@@ -140,6 +141,12 @@ export default async function ListingPage({
             <li>✓ Frakt fra 45 kr med sporing</li>
             <li>✓ Angrerett i 24 timer etter mottak</li>
           </ul>
+          {!isOwn && (
+            <ReportListingButton
+              listingId={listing.id}
+              loggedIn={currentSeller != null}
+            />
+          )}
         </aside>
       </div>
 

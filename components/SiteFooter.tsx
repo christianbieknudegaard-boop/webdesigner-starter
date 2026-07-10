@@ -40,6 +40,16 @@ export default function SiteFooter() {
             <li>Sikker betaling holdes til boken er levert</li>
             <li>Ferdig frankert fraktetikett</li>
             <li>Kjøperbeskyttelse på alle kjøp</li>
+            <li>
+              <Link href="/personvern" className="hover:text-brand-dark">
+                Personvernerklæring
+              </Link>
+            </li>
+            <li>
+              <Link href="/vilkar" className="hover:text-brand-dark">
+                Brukervilkår
+              </Link>
+            </li>
           </ul>
         </div>
       </div>

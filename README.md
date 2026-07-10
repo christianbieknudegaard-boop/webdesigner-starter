@@ -35,6 +35,11 @@ nettleseren («Legg til på hjemskjerm»).
 - ✏️ Rediger (pris/tilstand/beskrivelse) og slett egne usolgte annonser
 - ⭐ Vurderinger: kjøper gir 1–5 stjerner etter levering; selgerens
   snittvurdering regnes om automatisk
+- 🚩 Rapporter annonse (svindel, feil informasjon m.m.) – lagres for
+  manuell gjennomgang til admin-panel er på plass
+- 🔒 GDPR: personvernerklæring og brukervilkår (utkast – må
+  kvalitetssikres juridisk), og «slett kontoen min» på Min side som
+  fjerner annonser/samtaler og anonymiserer profilen
 - 🔌 REST-API (`/api/listings`) som mobilappen bruker
 - 📱 Mobilapp med Hjem (søk/liste), Selg og Min side
 

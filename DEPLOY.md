@@ -84,5 +84,7 @@ gang («Legg til på hjemskjerm») – PWA-manifestet er allerede på plass.
 - **E-postverifisering / glemt passord** mangler.
 - **Rate-limiting** på API-et mangler (vurder Vercel WAF eller
   `@upstash/ratelimit`).
-- **Personvern**: før lansering trengs personvernerklæring og
-  brukervilkår (GDPR).
+- **Personvern**: utkast til personvernerklæring (`/personvern`) og
+  brukervilkår (`/vilkar`) ligger inne med hakeparentes-felter som må
+  fylles inn (selskapsnavn, kontakt-e-post m.m.) og kvalitetssikres
+  juridisk før lansering.

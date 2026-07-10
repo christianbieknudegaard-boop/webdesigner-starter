@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import ListingCard from "@/components/ListingCard";
+import DeleteAccountButton from "@/components/DeleteAccountButton";
 import LogoutButton from "@/components/LogoutButton";
 import OrderCard, { OrderView } from "@/components/OrderCard";
 import { getCurrentSeller } from "@/lib/auth";
@@ -156,6 +157,10 @@ export default async function ProfilePage() {
           </div>
         </section>
       )}
+
+      <div className="mt-14 border-t border-border pt-6">
+        <DeleteAccountButton />
+      </div>
     </div>
   );
 }
