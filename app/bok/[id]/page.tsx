@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import BookCover from "@/components/BookCover";
 import BuyButton from "@/components/BuyButton";
 import ListingCard from "@/components/ListingCard";
+import ManageListing from "@/components/ManageListing";
 import MessageSellerButton from "@/components/MessageSellerButton";
 import { getCurrentSeller } from "@/lib/auth";
 import { getListing, searchListings } from "@/lib/data";
@@ -113,13 +114,12 @@ export default async function ListingPage({
             </p>
           )}
           {listing.sold ? null : isOwn ? (
-            <p className="mt-4 rounded-xl bg-brand-light px-4 py-3 text-sm font-medium text-brand-dark">
-              Dette er din annonse. Du finner den på{" "}
-              <Link href="/profil" className="underline">
-                Min side
-              </Link>
-              .
-            </p>
+            <ManageListing
+              listingId={listing.id}
+              price={listing.price}
+              condition={listing.condition}
+              description={listing.description}
+            />
           ) : (
             <>
               <BuyButton

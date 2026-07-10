@@ -79,9 +79,21 @@ function ListingDetail({
 }) {
   const { user } = useAuth();
   const [buying, setBuying] = useState(false);
+  const [showAddress, setShowAddress] = useState(false);
+  const [address, setAddress] = useState({
+    name: "",
+    street: "",
+    postalCode: "",
+    city: "",
+  });
   const [question, setQuestion] = useState("");
   const [asking, setAsking] = useState(false);
   const isOwn = user?.id === listing.seller.id;
+  const addressComplete = Object.values(address).every((v) => v.trim());
+
+  function setAddressField(key: keyof typeof address, value: string) {
+    setAddress((a) => ({ ...a, [key]: value }));
+  }
 
   async function ask() {
     if (!user) {
@@ -119,9 +131,13 @@ function ListingDetail({
       );
       return;
     }
+    if (!showAddress) {
+      setShowAddress(true);
+      return;
+    }
     setBuying(true);
     try {
-      await buyListing(listing.id);
+      await buyListing(listing.id, address);
       Alert.alert(
         "Boken er din! 🎉",
         "Selgeren får beskjed og sender boken. Betaling kommer i neste versjon."
@@ -199,13 +215,59 @@ function ListingDetail({
           <Text style={styles.ownNotice}>Dette er din egen annonse.</Text>
         ) : (
           <>
+            {showAddress && (
+              <View style={styles.addressBox}>
+                <Text style={styles.addressLabel}>Leveringsadresse</Text>
+                <TextInput
+                  style={styles.addressInput}
+                  placeholder="Fullt navn"
+                  placeholderTextColor={colors.muted}
+                  value={address.name}
+                  onChangeText={(v) => setAddressField("name", v)}
+                />
+                <TextInput
+                  style={styles.addressInput}
+                  placeholder="Gateadresse"
+                  placeholderTextColor={colors.muted}
+                  value={address.street}
+                  onChangeText={(v) => setAddressField("street", v)}
+                />
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <TextInput
+                    style={[styles.addressInput, { width: 100 }]}
+                    placeholder="Postnr."
+                    placeholderTextColor={colors.muted}
+                    keyboardType="numeric"
+                    maxLength={4}
+                    value={address.postalCode}
+                    onChangeText={(v) => setAddressField("postalCode", v)}
+                  />
+                  <TextInput
+                    style={[styles.addressInput, { flex: 1 }]}
+                    placeholder="Sted"
+                    placeholderTextColor={colors.muted}
+                    value={address.city}
+                    onChangeText={(v) => setAddressField("city", v)}
+                  />
+                </View>
+              </View>
+            )}
             <Pressable
-              style={[styles.buyButton, buying && { opacity: 0.6 }]}
+              style={[
+                styles.buyButton,
+                (buying || (showAddress && !addressComplete)) && {
+                  opacity: 0.6,
+                },
+              ]}
               onPress={buy}
-              disabled={buying}
+              disabled={buying || (showAddress && !addressComplete)}
             >
               <Text style={styles.buyButtonText}>
-                {buying ? "Kjøper …" : "Kjøp nå"}
+                {buying
+                  ? "Kjøper …"
+                  : showAddress
+                    ? "Bekreft kjøp"
+                    : "Kjøp nå"}
               </Text>
             </Pressable>
 
@@ -428,6 +490,25 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   buyButtonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  addressBox: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    marginTop: 16,
+    gap: 8,
+  },
+  addressLabel: { fontWeight: "700", color: colors.brandDark },
+  addressInput: {
+    backgroundColor: colors.background,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    color: colors.foreground,
+  },
   askBox: { flexDirection: "row", gap: 8, marginTop: 12 },
   askInput: {
     flex: 1,

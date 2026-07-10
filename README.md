@@ -31,6 +31,10 @@ nettleseren («Legg til på hjemskjerm»).
   (selve betalingen kobles på når Vipps/Stripe-avtale er klar)
 - 💬 Meldinger: spør selgeren direkte fra annonsen, svar i trådvisning,
   uleste-merke i menyen – egen fane i mobilappen
+- 📦 Leveringsadresse ved kjøp – selgeren ser adressen under «Mine salg»
+- ✏️ Rediger (pris/tilstand/beskrivelse) og slett egne usolgte annonser
+- ⭐ Vurderinger: kjøper gir 1–5 stjerner etter levering; selgerens
+  snittvurdering regnes om automatisk
 - 🔌 REST-API (`/api/listings`) som mobilappen bruker
 - 📱 Mobilapp med Hjem (søk/liste), Selg og Min side
 

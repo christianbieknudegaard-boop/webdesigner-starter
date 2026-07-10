@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSellerFromRequest } from "@/lib/auth";
 import {
   OrderError,
+  ShippingAddress,
   createOrder,
   getPurchases,
   getSales,
+  validateAddress,
 } from "@/lib/orders";
 
 /** GET /api/orders – mine kjøp og salg (krever innlogging). */
@@ -30,7 +32,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let body: { listingId?: string };
+  let body: { listingId?: string; address?: Partial<ShippingAddress> };
   try {
     body = await request.json();
   } catch {
@@ -41,7 +43,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const order = await createOrder(body.listingId, seller.id);
+    const address = validateAddress(body.address);
+    const order = await createOrder(body.listingId, seller.id, address);
     return NextResponse.json({ order }, { status: 201 });
   } catch (e) {
     if (e instanceof OrderError) {

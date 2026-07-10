@@ -132,6 +132,84 @@ export function validateNewListing(
   return null;
 }
 
+export class ListingError extends Error {
+  constructor(
+    message: string,
+    public status: number
+  ) {
+    super(message);
+  }
+}
+
+export interface ListingUpdate {
+  price?: number;
+  condition?: string;
+  description?: string;
+}
+
+/** Oppdaterer egen usolgt annonse (pris, tilstand, beskrivelse). */
+export async function updateListing(
+  id: string,
+  sellerId: string,
+  update: ListingUpdate
+) {
+  const listing = await prisma.listing.findUnique({ where: { id } });
+  if (!listing) throw new ListingError("Fant ikke annonsen", 404);
+  if (listing.sellerId !== sellerId)
+    throw new ListingError("Du kan bare endre dine egne annonser", 403);
+  if (listing.sold)
+    throw new ListingError("Solgte annonser kan ikke endres", 409);
+
+  const data: ListingUpdate = {};
+  if (update.price !== undefined) {
+    if (
+      typeof update.price !== "number" ||
+      !Number.isInteger(update.price) ||
+      update.price <= 0
+    )
+      throw new ListingError("Prisen må være et positivt heltall", 400);
+    data.price = update.price;
+  }
+  if (update.condition !== undefined) {
+    if (!(update.condition in CONDITION_LABELS))
+      throw new ListingError("Ugyldig tilstand", 400);
+    data.condition = update.condition;
+  }
+  if (update.description !== undefined) {
+    if (typeof update.description !== "string")
+      throw new ListingError("Ugyldig beskrivelse", 400);
+    data.description = update.description.trim();
+  }
+
+  const row = await prisma.listing.update({
+    where: { id },
+    data,
+    include: { seller: true },
+  });
+  return toListing(row);
+}
+
+/**
+ * Sletter egen usolgt annonse. Tilhørende samtaler (og meldinger via
+ * cascade) fjernes i samme transaksjon.
+ */
+export async function deleteListing(id: string, sellerId: string) {
+  await prisma.$transaction(async (tx) => {
+    const listing = await tx.listing.findUnique({
+      where: { id },
+      include: { order: true },
+    });
+    if (!listing) throw new ListingError("Fant ikke annonsen", 404);
+    if (listing.sellerId !== sellerId)
+      throw new ListingError("Du kan bare slette dine egne annonser", 403);
+    if (listing.sold || listing.order)
+      throw new ListingError("Solgte annonser kan ikke slettes", 409);
+
+    await tx.conversation.deleteMany({ where: { listingId: id } });
+    await tx.listing.delete({ where: { id } });
+  });
+}
+
 export async function createListing(
   input: NewListingInput,
   sellerId: string

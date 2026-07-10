@@ -42,6 +42,7 @@ export default async function ProfilePage() {
     statusLabel: ORDER_STATUS_LABELS[o.status as OrderStatus] ?? o.status,
     totalPrice: o.itemPrice + o.shippingPrice,
     createdAt: o.createdAt.toISOString(),
+    rating: o.rating,
   }));
   const saleViews: OrderView[] = sales.map((o) => ({
     id: o.id,
@@ -53,6 +54,9 @@ export default async function ProfilePage() {
     statusLabel: ORDER_STATUS_LABELS[o.status as OrderStatus] ?? o.status,
     totalPrice: o.itemPrice,
     createdAt: o.createdAt.toISOString(),
+    shippingAddress: o.shipStreet
+      ? `${o.shipName}, ${o.shipStreet}, ${o.shipPostalCode} ${o.shipCity}`
+      : undefined,
   }));
 
   return (

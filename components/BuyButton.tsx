@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 interface Props {
   listingId: string;
@@ -17,11 +16,20 @@ export default function BuyButton({
   shippingPrice,
   loggedIn,
 }: Props) {
-  const router = useRouter();
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [address, setAddress] = useState({
+    name: "",
+    street: "",
+    postalCode: "",
+    city: "",
+  });
+
+  function setField(key: keyof typeof address, value: string) {
+    setAddress((a) => ({ ...a, [key]: value }));
+  }
 
   if (!loggedIn) {
     return (
@@ -58,15 +66,16 @@ export default function BuyButton({
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ listingId }),
+        body: JSON.stringify({ listingId, address }),
       });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) {
         setError(data.error ?? "Noe gikk galt. Prøv igjen.");
         return;
       }
+      // Ingen router.refresh() her: siden ville byttet til "solgt"-visning
+      // og fjernet suksessmeldingen. Solgt-status vises ved neste besøk.
       setDone(true);
-      router.refresh();
     } catch {
       setError("Fikk ikke kontakt med serveren. Prøv igjen.");
     } finally {
@@ -91,6 +100,41 @@ export default function BuyButton({
             <span>{price + shippingPrice} kr</span>
           </p>
         </div>
+        <p className="mt-3 text-sm font-medium">Leveringsadresse</p>
+        <div className="mt-1 space-y-2">
+          <input
+            className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-brand"
+            placeholder="Fullt navn"
+            autoComplete="name"
+            value={address.name}
+            onChange={(e) => setField("name", e.target.value)}
+          />
+          <input
+            className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-brand"
+            placeholder="Gateadresse"
+            autoComplete="street-address"
+            value={address.street}
+            onChange={(e) => setField("street", e.target.value)}
+          />
+          <div className="flex gap-2">
+            <input
+              className="w-28 rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-brand"
+              placeholder="Postnr."
+              inputMode="numeric"
+              maxLength={4}
+              autoComplete="postal-code"
+              value={address.postalCode}
+              onChange={(e) => setField("postalCode", e.target.value)}
+            />
+            <input
+              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-brand"
+              placeholder="Sted"
+              autoComplete="address-level2"
+              value={address.city}
+              onChange={(e) => setField("city", e.target.value)}
+            />
+          </div>
+        </div>
         <p className="mt-2 text-xs text-muted">
           Betaling kommer i neste versjon – kjøpet reserverer boken for deg.
         </p>
@@ -102,7 +146,7 @@ export default function BuyButton({
         <div className="mt-3 flex gap-2">
           <button
             onClick={buy}
-            disabled={busy}
+            disabled={busy || Object.values(address).some((v) => !v.trim())}
             className="w-full rounded-full bg-accent py-2.5 font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
           >
             {busy ? "Kjøper …" : "Bekreft kjøp"}
