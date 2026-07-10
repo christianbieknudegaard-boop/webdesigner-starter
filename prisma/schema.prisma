@@ -11,13 +11,26 @@ datasource db {
 }
 
 model Seller {
-  id          String    @id @default(cuid())
-  name        String
-  city        String
-  rating      Float     @default(0)
-  salesCount  Int       @default(0)
-  memberSince DateTime  @default(now())
-  listings    Listing[]
+  id           String    @id @default(cuid())
+  name         String
+  city         String
+  email        String?   @unique
+  passwordHash String?
+  rating       Float     @default(0)
+  salesCount   Int       @default(0)
+  memberSince  DateTime  @default(now())
+  listings     Listing[]
+  sessions     Session[]
+}
+
+model Session {
+  token     String   @id
+  seller    Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  sellerId  String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([sellerId])
 }
 
 model Listing {

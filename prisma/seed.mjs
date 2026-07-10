@@ -1,13 +1,16 @@
 // Fyller databasen med demodata. Kjør: npm run db:seed
+// Demo-kontoene kan logge inn med passordet "bokfink123".
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
+const demoHash = bcrypt.hashSync("bokfink123", 10);
 
 const SELLERS = [
-  { id: "s1", name: "Ingrid H.", city: "Oslo", rating: 4.9, salesCount: 128, memberSince: new Date("2023-02-14") },
-  { id: "s2", name: "Magnus L.", city: "Bergen", rating: 4.7, salesCount: 54, memberSince: new Date("2024-06-01") },
-  { id: "s3", name: "Sofie K.", city: "Trondheim", rating: 5.0, salesCount: 211, memberSince: new Date("2022-09-30") },
-  { id: "s4", name: "Even R.", city: "Stavanger", rating: 4.5, salesCount: 33, memberSince: new Date("2025-01-12") },
+  { id: "s1", name: "Ingrid H.", city: "Oslo", email: "ingrid@example.com", passwordHash: demoHash, rating: 4.9, salesCount: 128, memberSince: new Date("2023-02-14") },
+  { id: "s2", name: "Magnus L.", city: "Bergen", email: "magnus@example.com", passwordHash: demoHash, rating: 4.7, salesCount: 54, memberSince: new Date("2024-06-01") },
+  { id: "s3", name: "Sofie K.", city: "Trondheim", email: "sofie@example.com", passwordHash: demoHash, rating: 5.0, salesCount: 211, memberSince: new Date("2022-09-30") },
+  { id: "s4", name: "Even R.", city: "Stavanger", email: "even@example.com", passwordHash: demoHash, rating: 4.5, salesCount: 33, memberSince: new Date("2025-01-12") },
 ];
 
 const LISTINGS = [

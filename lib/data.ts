@@ -147,15 +147,3 @@ export async function createListing(
   });
   return toListing(row);
 }
-
-/**
- * Demo-selgeren som eier nye annonser til innlogging er på plass.
- * Finnes ikke brukeren (tom database), opprettes den.
- */
-export async function getDemoSeller() {
-  return prisma.seller.upsert({
-    where: { id: "s1" },
-    update: {},
-    create: { id: "s1", name: "Ingrid H.", city: "Oslo", rating: 4.9, salesCount: 128 },
-  });
-}

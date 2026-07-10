@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getSellerFromRequest } from "@/lib/auth";
 import {
   NewListingInput,
   createListing,
-  getDemoSeller,
   searchListings,
   validateNewListing,
 } from "@/lib/data";
@@ -25,11 +25,16 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ listings });
 }
 
-/**
- * POST /api/listings – opprett en annonse.
- * Inntil innlogging er på plass eies alle nye annonser av demo-selgeren.
- */
+/** POST /api/listings – opprett en annonse (krever innlogging). */
 export async function POST(request: NextRequest) {
+  const seller = await getSellerFromRequest(request);
+  if (!seller) {
+    return NextResponse.json(
+      { error: "Du må være innlogget for å legge ut en annonse" },
+      { status: 401 }
+    );
+  }
+
   let body: Partial<NewListingInput>;
   try {
     body = await request.json();
@@ -42,7 +47,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error }, { status: 400 });
   }
 
-  const seller = await getDemoSeller();
   const listing = await createListing(body as NewListingInput, seller.id);
   return NextResponse.json({ listing }, { status: 201 });
 }

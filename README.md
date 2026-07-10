@@ -21,7 +21,9 @@ nettleseren («Legg til på hjemskjerm»).
 - 🏷️ «Selg en bok»-flyt med prisveiledning per tilstand
 - 📷 Strekkodeskanning (ISBN) og tekstsøk som autoutfyller bokdetaljene
   når du skal selge – med Google Books som reserve for ukjente ISBN
-- 👤 Min side med aktive annonser, solgte bøker og statistikk
+- 👤 Innlogging med e-post og passord – annonser knyttes til kontoen din
+  (samme API brukes av mobilappen med Bearer-token)
+- 🙋 Min side med aktive annonser, solgte bøker og statistikk
 - 🔌 REST-API (`/api/listings`) som mobilappen bruker
 - 📱 Mobilapp med Hjem (søk/liste), Selg og Min side
 
@@ -42,6 +44,9 @@ npm run dev
 ```
 
 Åpne [http://localhost:3000](http://localhost:3000).
+
+Demodataene inkluderer fire kontoer du kan logge inn med, f.eks.
+`ingrid@example.com` med passordet `bokfink123`.
 
 ## Kom i gang – mobilappen
 
@@ -75,8 +80,8 @@ mobile/         Expo-appen
 
 ## Veikart
 
-1. **Innlogging** – Vipps Login og e-post (nye annonser eies i dag av en
-   demo-bruker)
+1. **Vipps Login** – i tillegg til e-post/passord (krever Vipps-avtale);
+   mobilappen bør også lagre sesjonen med expo-secure-store
 2. **Betaling** – Vipps/Stripe med pengene i forvaring til levert bok
 3. **Frakt** – ferdig frankert etikett via Posten/Helthjem-API
 4. **Bilder** – opplasting av ekte bokbilder (erstatter fargeomslagene)

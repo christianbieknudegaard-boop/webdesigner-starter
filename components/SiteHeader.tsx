@@ -1,7 +1,10 @@
 import Link from "next/link";
 import Logo from "@/components/Logo";
+import { getCurrentSeller } from "@/lib/auth";
 
-export default function SiteHeader() {
+export default async function SiteHeader() {
+  const seller = await getCurrentSeller();
+
   return (
     <header className="sticky top-0 z-20 border-b border-border bg-surface/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
@@ -19,9 +22,15 @@ export default function SiteHeader() {
           <Link href="/selg" className="hover:text-brand-dark">
             Selg bøker
           </Link>
-          <Link href="/profil" className="hover:text-brand-dark">
-            Min side
-          </Link>
+          {seller ? (
+            <Link href="/profil" className="hover:text-brand-dark">
+              {seller.name.split(" ")[0]}
+            </Link>
+          ) : (
+            <Link href="/logg-inn" className="hover:text-brand-dark">
+              Logg inn
+            </Link>
+          )}
         </nav>
 
         <Link
@@ -36,7 +45,11 @@ export default function SiteHeader() {
       <nav className="flex items-center justify-around border-t border-border py-2 text-sm font-medium text-muted sm:hidden">
         <Link href="/boker">Finn bøker</Link>
         <Link href="/selg">Selg bøker</Link>
-        <Link href="/profil">Min side</Link>
+        {seller ? (
+          <Link href="/profil">Min side</Link>
+        ) : (
+          <Link href="/logg-inn">Logg inn</Link>
+        )}
       </nav>
     </header>
   );

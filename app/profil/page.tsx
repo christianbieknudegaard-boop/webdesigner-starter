@@ -1,5 +1,8 @@
+import { redirect } from "next/navigation";
 import ListingCard from "@/components/ListingCard";
-import { getDemoSeller, searchListings } from "@/lib/data";
+import LogoutButton from "@/components/LogoutButton";
+import { getCurrentSeller } from "@/lib/auth";
+import { searchListings } from "@/lib/data";
 
 export const metadata = {
   title: "Min side",
@@ -7,9 +10,10 @@ export const metadata = {
 
 export const dynamic = "force-dynamic";
 
-// Prototype: viser en fast demo-bruker til innlogging er på plass.
 export default async function ProfilePage() {
-  const seller = await getDemoSeller();
+  const seller = await getCurrentSeller();
+  if (!seller) redirect("/logg-inn");
+
   const all = await searchListings({
     includeSold: true,
     sellerId: seller.id,
@@ -20,24 +24,29 @@ export default async function ProfilePage() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-4">
-        <span className="flex h-16 w-16 items-center justify-center rounded-full bg-brand text-2xl font-bold text-white">
-          {seller.name[0]}
-        </span>
-        <div>
-          <h1 className="text-3xl font-bold text-brand-dark">{seller.name}</h1>
-          <p className="text-muted">
-            {seller.city} · medlem siden{" "}
-            {new Date(seller.memberSince).getFullYear()}
-          </p>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-brand text-2xl font-bold text-white">
+            {seller.name[0]}
+          </span>
+          <div>
+            <h1 className="text-3xl font-bold text-brand-dark">
+              {seller.name}
+            </h1>
+            <p className="text-muted">
+              {seller.city} · medlem siden{" "}
+              {new Date(seller.memberSince).getFullYear()}
+            </p>
+          </div>
         </div>
+        <LogoutButton />
       </div>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-3">
         <div className="rounded-2xl border border-border bg-surface p-5">
           <p className="text-sm text-muted">Vurdering</p>
           <p className="mt-1 text-2xl font-bold text-brand-dark">
-            ⭐ {seller.rating.toFixed(1)}
+            {seller.salesCount > 0 ? `⭐ ${seller.rating.toFixed(1)}` : "–"}
           </p>
         </div>
         <div className="rounded-2xl border border-border bg-surface p-5">
@@ -47,7 +56,7 @@ export default async function ProfilePage() {
           </p>
         </div>
         <div className="rounded-2xl border border-border bg-surface p-5">
-          <p className="text-sm text-muted">Tjent på Bokfink (demo)</p>
+          <p className="text-sm text-muted">Tjent på Bokfink</p>
           <p className="mt-1 text-2xl font-bold text-brand-dark">{earned} kr</p>
         </div>
       </div>
@@ -56,11 +65,20 @@ export default async function ProfilePage() {
         <h2 className="text-2xl font-bold text-brand-dark">
           Aktive annonser ({active.length})
         </h2>
-        <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {active.map((l) => (
-            <ListingCard key={l.id} listing={l} />
-          ))}
-        </div>
+        {active.length === 0 ? (
+          <p className="mt-4 rounded-2xl border border-dashed border-border bg-surface p-6 text-muted">
+            Du har ingen aktive annonser.{" "}
+            <a href="/selg" className="font-medium text-brand hover:underline">
+              Legg ut din første bok →
+            </a>
+          </p>
+        ) : (
+          <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            {active.map((l) => (
+              <ListingCard key={l.id} listing={l} />
+            ))}
+          </div>
+        )}
       </section>
 
       {sold.length > 0 && (
@@ -75,11 +93,6 @@ export default async function ProfilePage() {
           </div>
         </section>
       )}
-
-      <p className="mt-10 rounded-2xl border border-dashed border-border bg-surface p-5 text-sm text-muted">
-        🔒 Dette er en demoprofil. Innlogging med Vipps/e-post, meldinger
-        mellom kjøper og selger, og utbetalinger kommer i neste versjon.
-      </p>
     </div>
   );
 }

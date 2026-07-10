@@ -21,9 +21,11 @@ import {
   lookupIsbn,
   searchCatalog,
 } from "../api";
+import { useAuth } from "../AuthContext";
 import { colors } from "../theme";
 
 export default function SellScreen() {
+  const { user } = useAuth();
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
   const [isbn, setIsbn] = useState("");
@@ -133,6 +135,19 @@ export default function SellScreen() {
     } finally {
       setSaving(false);
     }
+  }
+
+  if (!user) {
+    return (
+      <View style={[styles.container, styles.loginPrompt]}>
+        <Text style={{ fontSize: 40 }}>🔑</Text>
+        <Text style={styles.heading}>Logg inn for å selge</Text>
+        <Text style={[styles.sub, { textAlign: "center" }]}>
+          Gå til «Min side»-fanen og logg inn eller opprett en konto – så kan
+          du legge ut bøker herfra.
+        </Text>
+      </View>
+    );
   }
 
   return (
@@ -305,6 +320,12 @@ export default function SellScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  loginPrompt: {
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 32,
+    gap: 8,
+  },
   heading: { fontSize: 26, fontWeight: "800", color: colors.brandDark },
   sub: { color: colors.muted, marginTop: 4, marginBottom: 12 },
   card: {

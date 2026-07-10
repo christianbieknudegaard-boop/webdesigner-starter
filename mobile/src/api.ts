@@ -7,6 +7,22 @@
 export const BASE_URL =
   process.env.EXPO_PUBLIC_API_URL ?? "http://192.168.1.1:3000";
 
+// Sesjonstoken holdes i minnet. Neste steg: expo-secure-store slik at
+// innloggingen overlever at appen startes på nytt.
+let authToken: string | null = null;
+
+export function setAuthToken(token: string | null) {
+  authToken = token;
+}
+
+export function getAuthToken() {
+  return authToken;
+}
+
+function authHeaders(): Record<string, string> {
+  return authToken ? { Authorization: `Bearer ${authToken}` } : {};
+}
+
 export type BookCondition = "som-ny" | "veldig-god" | "god" | "slitt";
 
 export const CONDITION_LABELS: Record<BookCondition, string> = {
@@ -93,7 +109,7 @@ export interface NewListing {
 export async function createListing(input: NewListing): Promise<Listing> {
   const res = await fetch(new URL("/api/listings", BASE_URL).toString(), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(input),
   });
   const data = (await res.json()) as { listing?: Listing; error?: string };
@@ -101,6 +117,63 @@ export async function createListing(input: NewListing): Promise<Listing> {
     throw new Error(data.error ?? `API-feil: ${res.status}`);
   }
   return data.listing;
+}
+
+export interface Profile {
+  id: string;
+  name: string;
+  city: string;
+  email: string | null;
+  rating: number;
+  salesCount: number;
+  memberSince: string;
+}
+
+interface AuthResponse {
+  seller?: Profile;
+  token?: string;
+  error?: string;
+}
+
+async function authRequest(
+  path: string,
+  body: Record<string, string>
+): Promise<Profile> {
+  const res = await fetch(new URL(path, BASE_URL).toString(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json()) as AuthResponse;
+  if (!res.ok || !data.seller || !data.token) {
+    throw new Error(data.error ?? `API-feil: ${res.status}`);
+  }
+  setAuthToken(data.token);
+  return data.seller;
+}
+
+export function login(email: string, password: string) {
+  return authRequest("/api/auth/login", { email, password });
+}
+
+export function register(
+  name: string,
+  city: string,
+  email: string,
+  password: string
+) {
+  return authRequest("/api/auth/registrer", { name, city, email, password });
+}
+
+export async function logout() {
+  try {
+    await fetch(new URL("/api/auth/logout", BASE_URL).toString(), {
+      method: "POST",
+      headers: authHeaders(),
+    });
+  } finally {
+    setAuthToken(null);
+  }
 }
 
 /** Tekstsøk i bokkatalogen (tittel, forfatter eller ISBN). */

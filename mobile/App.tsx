@@ -5,6 +5,7 @@ import { Text } from "react-native";
 import HomeScreen from "./src/screens/HomeScreen";
 import SellScreen from "./src/screens/SellScreen";
 import ProfileScreen from "./src/screens/ProfileScreen";
+import { AuthProvider } from "./src/AuthContext";
 import { colors } from "./src/theme";
 
 const Tab = createBottomTabNavigator();
@@ -16,6 +17,14 @@ const TABS = [
 ];
 
 export default function App() {
+  return (
+    <AuthProvider>
+      <AppNavigator />
+    </AuthProvider>
+  );
+}
+
+function AppNavigator() {
   return (
     <NavigationContainer>
       <StatusBar style="dark" />
