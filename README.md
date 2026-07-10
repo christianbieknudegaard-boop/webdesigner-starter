@@ -1,56 +1,74 @@
-# Webdesign Builder
+# 📖 Bokfink
 
-En kraftig og brukervennlig webdesign-applikasjon som lar deg lage profesjonelle hjemmesider på minutter.
+Markedsplass for brukte bøker – en konkurrent til Bookis. Kjøp og selg
+pensumbøker, romaner og barnebøker trygt og enkelt.
 
-## 🚀 Funksjoner
+Prosjektet består av to deler:
 
-- **Visuell redigering**: Live forhåndsvisning mens du bygger
-- **Responsivt design**: Fungerer perfekt på alle enheter
-- **Fargetilpasning**: Velg dine egne primær- og sekundærfarger
-- **Seksjonsbasert**: Hero, Om oss, Tjenester og Kontakt-seksjoner
-- **Eksport**: Last ned som HTML eller JSON-konfigurasjon
-- **Vercel-klar**: Enkel deployment til Vercel
+| Del | Mappe | Teknologi |
+| --- | --- | --- |
+| Nettside + API | rotmappen | Next.js 16, TypeScript, Tailwind CSS 4 |
+| Mobilapp | `mobile/` | React Native (Expo) |
 
-## 🛠️ Teknologi
+Nettsiden er også en **PWA** – den kan installeres på mobilen rett fra
+nettleseren («Legg til på hjemskjerm»).
 
-- **Next.js 15** - React-rammeverk
-- **TypeScript** - Type-sikkerhet
-- **Tailwind CSS** - Styling
-- **React** - UI-komponenter
+## Funksjoner i denne versjonen (MVP)
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+- 🔍 Søk på tittel, forfatter og ISBN, med kategorifilter
+- 📚 Bla i annonser med tilstand, pris og «du sparer»-prosent
+- 📄 Annonsedetaljer med selgerinfo, vurdering og relaterte bøker
+- 🏷️ «Selg en bok»-flyt med prisveiledning per tilstand
+- 👤 Min side med aktive annonser, solgte bøker og statistikk
+- 🔌 REST-API (`/api/listings`) som mobilappen bruker
+- 📱 Mobilapp med Hjem (søk/liste), Selg og Min side
 
-## Getting Started
+> Dette er en prototype med demodata i `lib/data.ts`. Neste steg er ekte
+> database, innlogging (Vipps/e-post), betaling og bildeopplasting – se
+> veikartet nederst.
 
-First, run the development server:
+## Kom i gang – nettsiden
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Åpne [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Kom i gang – mobilappen
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+cd mobile
+npm install
+EXPO_PUBLIC_API_URL=http://<din-lokale-ip>:3000 npm start
+```
 
-## Learn More
+Skann QR-koden med [Expo Go](https://expo.dev/go). Se `mobile/README.md`
+for detaljer.
 
-To learn more about Next.js, take a look at the following resources:
+## Struktur
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+app/            Sider og API-ruter (Next.js App Router)
+  boker/        Søk og bla i bøker
+  bok/[id]/     Annonsedetaljer
+  selg/         Selg en bok
+  profil/       Min side
+  api/listings/ REST-API (brukes av web og mobil)
+components/     Delte UI-komponenter
+lib/data.ts     Demodata og søkelogikk
+types/          Delte TypeScript-typer
+mobile/         Expo-appen
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Veikart
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. **Database** – bytt ut `lib/data.ts` med Postgres (f.eks. Supabase/Neon)
+2. **Innlogging** – Vipps Login og e-post
+3. **Betaling** – Vipps/Stripe med pengene i forvaring til levert bok
+4. **Frakt** – ferdig frankert etikett via Posten/Helthjem-API
+5. **Bilder** – opplasting av ekte bokbilder (erstatter fargeomslagene)
+6. **ISBN-oppslag** – autoutfylling av tittel/forfatter fra ISBN
+7. **Meldinger** – chat mellom kjøper og selger
+8. **App-butikkene** – bygg og publiser Expo-appen via EAS

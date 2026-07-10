@@ -1,71 +1,113 @@
-'use client';
+import Link from "next/link";
+import ListingCard from "@/components/ListingCard";
+import { searchListings } from "@/lib/data";
+import { CATEGORY_LABELS, Category } from "@/types/marketplace";
 
-import { useState } from 'react';
-import WebsiteBuilder from '@/components/WebsiteBuilder';
-import PreviewPane from '@/components/PreviewPane';
-import { WebsiteConfig } from '@/types/website';
+const STEPS = [
+  {
+    emoji: "📷",
+    title: "Legg ut boken",
+    text: "Skriv inn ISBN eller tittel, velg tilstand og pris. Ferdig på under ett minutt.",
+  },
+  {
+    emoji: "📦",
+    title: "Send med ferdig etikett",
+    text: "Når boken er solgt får du en ferdig frankert fraktetikett. Lever pakken i nærbutikken.",
+  },
+  {
+    emoji: "💸",
+    title: "Få betalt trygt",
+    text: "Pengene holdes trygt og utbetales til deg når kjøperen har mottatt boken.",
+  },
+];
 
 export default function Home() {
-  const [config, setConfig] = useState<WebsiteConfig>({
-    siteName: '',
-    tagline: '',
-    primaryColor: '#3B82F6',
-    secondaryColor: '#1F2937',
-    logo: '',
-    sections: {
-      hero: {
-        title: 'Velkommen til din nye hjemmeside',
-        subtitle: 'Vi hjelper deg med å bygge din drømmewebside',
-        ctaText: 'Kom i gang',
-        backgroundImage: '',
-      },
-      about: {
-        title: 'Om oss',
-        content: 'Fortell kundene dine hvem du er og hva du gjør.',
-      },
-      services: {
-        title: 'Våre tjenester',
-        items: [
-          { title: 'Tjeneste 1', description: 'Beskrivelse av tjeneste 1' },
-          { title: 'Tjeneste 2', description: 'Beskrivelse av tjeneste 2' },
-          { title: 'Tjeneste 3', description: 'Beskrivelse av tjeneste 3' },
-        ],
-      },
-      contact: {
-        title: 'Kontakt oss',
-        email: 'post@eksempel.no',
-        phone: '+47 123 45 678',
-        address: 'Gateadresse 1, 0123 Oslo',
-      },
-    },
-  });
+  const latest = searchListings().slice(0, 8);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <h1 className="text-2xl font-bold text-gray-900">Webdesign Builder</h1>
-          <p className="text-gray-600">Lag profesjonelle hjemmesider på minutter</p>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Input Panel */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold mb-4">Konfigurer din hjemmeside</h2>
-            <WebsiteBuilder config={config} onChange={setConfig} />
+    <div className="space-y-14">
+      {/* Hero */}
+      <section className="rounded-3xl bg-brand px-6 py-12 text-white sm:px-12">
+        <div className="max-w-2xl">
+          <h1 className="text-3xl font-bold leading-tight sm:text-5xl">
+            Gi bøkene dine et nytt liv
+          </h1>
+          <p className="mt-4 text-lg text-white/85">
+            Kjøp og selg brukte bøker enkelt og trygt. Spar penger på pensum,
+            finn din neste favorittroman – og rydd i bokhylla samtidig.
+          </p>
+          <form action="/boker" className="mt-8 flex max-w-xl gap-2">
+            <input
+              type="search"
+              name="q"
+              placeholder="Søk på tittel, forfatter eller ISBN …"
+              className="w-full rounded-full border-0 bg-white px-5 py-3 text-foreground outline-none placeholder:text-muted"
+            />
+            <button
+              type="submit"
+              className="shrink-0 rounded-full bg-accent px-6 py-3 font-semibold text-white transition hover:opacity-90"
+            >
+              Søk
+            </button>
+          </form>
+          <div className="mt-6 flex flex-wrap gap-4 text-sm text-white/80">
+            <span>✓ Kjøperbeskyttelse</span>
+            <span>✓ Ferdig frankert frakt</span>
+            <span>✓ Gratis å legge ut</span>
           </div>
+        </div>
+      </section>
 
-          {/* Preview Panel */}
-          <div className="lg:sticky lg:top-8 h-fit">
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-semibold mb-4">Forhåndsvisning</h2>
-              <PreviewPane config={config} />
+      {/* Categories */}
+      <section>
+        <h2 className="text-2xl font-bold text-brand-dark">Utforsk kategorier</h2>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {(Object.keys(CATEGORY_LABELS) as Category[]).map((cat) => (
+            <Link
+              key={cat}
+              href={`/boker?kategori=${cat}`}
+              className="rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground transition hover:border-brand hover:text-brand-dark"
+            >
+              {CATEGORY_LABELS[cat]}
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* Latest listings */}
+      <section>
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-2xl font-bold text-brand-dark">Nyeste bøker</h2>
+          <Link href="/boker" className="text-sm font-medium text-brand hover:underline">
+            Se alle →
+          </Link>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          {latest.map((listing) => (
+            <ListingCard key={listing.id} listing={listing} />
+          ))}
+        </div>
+      </section>
+
+      {/* How it works */}
+      <section className="rounded-3xl border border-border bg-surface px-6 py-10 sm:px-12">
+        <h2 className="text-2xl font-bold text-brand-dark">Slik fungerer det</h2>
+        <div className="mt-6 grid gap-8 sm:grid-cols-3">
+          {STEPS.map((step) => (
+            <div key={step.title}>
+              <span className="text-3xl">{step.emoji}</span>
+              <h3 className="mt-3 font-semibold">{step.title}</h3>
+              <p className="mt-1 text-sm text-muted">{step.text}</p>
             </div>
-          </div>
+          ))}
         </div>
-      </main>
+        <Link
+          href="/selg"
+          className="mt-8 inline-block rounded-full bg-brand px-6 py-3 font-semibold text-white transition hover:bg-brand-dark"
+        >
+          Kom i gang – selg din første bok
+        </Link>
+      </section>
     </div>
   );
 }

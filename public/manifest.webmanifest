@@ -1,0 +1,18 @@
+{
+  "name": "Bokfink – kjøp og selg brukte bøker",
+  "short_name": "Bokfink",
+  "description": "Markedsplassen for brukte bøker. Kjøp og selg trygt.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#faf7f2",
+  "theme_color": "#2f5d50",
+  "lang": "nb",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

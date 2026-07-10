@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "Bokfink",
+    "slug": "bokfink",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "bokfink",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#faf7f2",
+    "primaryColor": "#2f5d50",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "no.bokfink.app"
+    },
+    "android": {
+      "package": "no.bokfink.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#2f5d50"
+      }
+    }
+  }
+}
