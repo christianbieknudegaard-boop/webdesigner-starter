@@ -24,6 +24,8 @@ nettleseren («Legg til på hjemskjerm»).
 - 👤 Innlogging med e-post og passord – annonser knyttes til kontoen din
   (samme API brukes av mobilappen med Bearer-token)
 - 🙋 Min side med aktive annonser, solgte bøker og statistikk
+- 🖼️ Bildeopplasting: ta bilde av boken (kamera/galleri på mobil, filvelger
+  på nett) – vises i annonsekort og på annonsesiden
 - 🔌 REST-API (`/api/listings`) som mobilappen bruker
 - 📱 Mobilapp med Hjem (søk/liste), Selg og Min side
 
@@ -84,7 +86,9 @@ mobile/         Expo-appen
    mobilappen bør også lagre sesjonen med expo-secure-store
 2. **Betaling** – Vipps/Stripe med pengene i forvaring til levert bok
 3. **Frakt** – ferdig frankert etikett via Posten/Helthjem-API
-4. **Bilder** – opplasting av ekte bokbilder (erstatter fargeomslagene)
+4. **Bildelagring i skyen** – opplastede bilder ligger i dag i `uploads/`
+   på serveren; bytt `lib/storage.ts` til Vercel Blob/S3 ved deploy på
+   serverless
 5. **Bokkatalog** – utvid `lib/catalog.ts` til en ekte bokdatabase
    (f.eks. Bokbasen) i stedet for demodata + Google Books
 6. **Meldinger** – chat mellom kjøper og selger

@@ -62,6 +62,7 @@ export interface Listing {
   originalPrice?: number;
   description: string;
   coverColor: string;
+  imageUrl?: string;
   createdAt: string;
   sold: boolean;
   seller: Seller;
@@ -103,6 +104,33 @@ export interface NewListing {
   condition: BookCondition;
   price: number;
   description?: string;
+  imageUrl?: string;
+}
+
+/**
+ * Laster opp et bokbilde fra en lokal fil-URI (expo-image-picker) og
+ * returnerer URL-en bildet serveres på.
+ */
+export async function uploadImage(uri: string): Promise<string> {
+  const name = uri.split("/").pop() ?? "bilde.jpg";
+  const ext = name.split(".").pop()?.toLowerCase();
+  const type =
+    ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+
+  const form = new FormData();
+  // React Native FormData tar { uri, name, type } for filer.
+  form.append("file", { uri, name, type } as unknown as Blob);
+
+  const res = await fetch(new URL("/api/upload", BASE_URL).toString(), {
+    method: "POST",
+    headers: authHeaders(),
+    body: form,
+  });
+  const data = (await res.json()) as { url?: string; error?: string };
+  if (!res.ok || !data.url) {
+    throw new Error(data.error ?? `API-feil: ${res.status}`);
+  }
+  return data.url;
 }
 
 /** Oppretter en annonse. Kaster ved valideringsfeil fra serveren. */

@@ -12,6 +12,7 @@ export default function ListingCard({ listing }: { listing: ListingWithSeller })
         title={listing.title}
         author={listing.author}
         color={listing.coverColor}
+        imageUrl={listing.imageUrl}
         className="transition group-hover:scale-[1.01]"
       />
       <div className="mt-3 flex flex-1 flex-col">

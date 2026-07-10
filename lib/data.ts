@@ -22,6 +22,7 @@ function toListing(row: ListingRow): ListingWithSeller {
     originalPrice: row.originalPrice ?? undefined,
     description: row.description,
     coverColor: row.coverColor,
+    imageUrl: row.imageUrl ?? undefined,
     sellerId: row.sellerId,
     createdAt: row.createdAt.toISOString(),
     sold: row.sold,
@@ -101,6 +102,7 @@ export interface NewListingInput {
   price: number;
   originalPrice?: number;
   description?: string;
+  imageUrl?: string;
 }
 
 export function validateNewListing(
@@ -119,6 +121,9 @@ export function validateNewListing(
     !Number.isInteger(input.price)
   )
     return "Prisen må være et positivt heltall i kroner";
+  // Kun bilder lastet opp via vårt eget API godtas.
+  if (input.imageUrl && !/^\/api\/bilder\/[a-f0-9]{32}\.(jpg|png|webp)$/.test(input.imageUrl))
+    return "Ugyldig bilde-URL";
   return null;
 }
 
@@ -141,6 +146,7 @@ export async function createListing(
       originalPrice: input.originalPrice ?? null,
       description: input.description?.trim() ?? "",
       coverColor,
+      imageUrl: input.imageUrl ?? null,
       sellerId,
     },
     include: { seller: true },

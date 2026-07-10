@@ -52,6 +52,8 @@ const inputCls =
 export default function SellForm() {
   const [form, setForm] = useState<FormState>(EMPTY);
   const [originalPrice, setOriginalPrice] = useState<number | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [createdId, setCreatedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -188,10 +190,30 @@ export default function SellForm() {
     setError(null);
     setSaving(true);
     try {
+      let imageUrl: string | undefined;
+      if (imageFile) {
+        const formData = new FormData();
+        formData.append("file", imageFile);
+        const uploadRes = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+        const uploadData = (await uploadRes.json()) as {
+          url?: string;
+          error?: string;
+        };
+        if (!uploadRes.ok || !uploadData.url) {
+          setError(uploadData.error ?? "Bildeopplastingen feilet. Prøv igjen.");
+          return;
+        }
+        imageUrl = uploadData.url;
+      }
+
       const res = await fetch("/api/listings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          imageUrl,
           title: form.title,
           author: form.author,
           isbn: form.isbn,
@@ -240,6 +262,8 @@ export default function SellForm() {
             onClick={() => {
               setForm(EMPTY);
               setOriginalPrice(null);
+              setImageFile(null);
+              setImagePreview(null);
               setBookChosen(false);
               setLookupMessage(null);
               setCreatedId(null);
@@ -453,6 +477,59 @@ export default function SellForm() {
               : PRICE_HINTS[form.condition]}
           </p>
         )}
+      </div>
+
+      {/* Steg 4: Bilde */}
+      <div className="rounded-2xl border border-border bg-surface p-5">
+        <h2 className="font-semibold text-brand-dark">
+          4. Bilde av boken (valgfritt)
+        </h2>
+        <p className="mt-1 text-sm text-muted">
+          Annonser med ekte bilde selger raskere. Ta bilde av forsiden i godt
+          lys.
+        </p>
+        <div className="mt-3 flex items-start gap-4">
+          <label className="cursor-pointer rounded-xl border border-dashed border-border bg-background px-4 py-3 text-sm font-medium text-brand transition hover:border-brand">
+            📷 {imageFile ? "Bytt bilde" : "Velg eller ta bilde"}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null;
+                if (file && file.size > 5 * 1024 * 1024) {
+                  setError("Bildet kan være maks 5 MB.");
+                  return;
+                }
+                setError(null);
+                setImageFile(file);
+                setImagePreview(file ? URL.createObjectURL(file) : null);
+              }}
+            />
+          </label>
+          {imagePreview && (
+            <div className="flex items-start gap-2">
+              {/* eslint-disable-next-line @next/next/no-img-element -- lokal objectURL-forhåndsvisning */}
+              <img
+                src={imagePreview}
+                alt="Forhåndsvisning av bokbildet"
+                className="h-28 w-20 rounded-lg border border-border object-cover"
+              />
+              <button
+                type="button"
+                aria-label="Fjern bildet"
+                onClick={() => {
+                  setImageFile(null);
+                  setImagePreview(null);
+                }}
+                className="rounded-full px-2 py-1 text-muted hover:bg-brand-light"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       <div>

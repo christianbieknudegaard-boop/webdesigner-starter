@@ -39,6 +39,9 @@ yarn-error.log*
 # lokal database
 prisma/dev.db*
 
+# opplastede bokbilder
+/uploads/
+
 # vercel
 .vercel
 

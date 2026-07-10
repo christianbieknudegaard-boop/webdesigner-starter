@@ -46,6 +46,7 @@ export interface Listing {
   originalPrice?: number; // new price in store, NOK
   description: string;
   coverColor: string; // placeholder cover background
+  imageUrl?: string; // uploaded photo; coverColor is the fallback
   sellerId: string;
   createdAt: string; // ISO date
   sold: boolean;

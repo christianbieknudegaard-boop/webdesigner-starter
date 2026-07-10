@@ -36,6 +36,7 @@ export default async function ListingPage({
           title={listing.title}
           author={listing.author}
           color={listing.coverColor}
+          imageUrl={listing.imageUrl}
           className="mx-auto w-56 lg:w-full"
         />
 
@@ -50,9 +51,11 @@ export default async function ListingPage({
             <span className="rounded-full border border-border bg-surface px-3 py-1">
               {CATEGORY_LABELS[listing.category]}
             </span>
-            <span className="rounded-full border border-border bg-surface px-3 py-1">
-              ISBN {listing.isbn}
-            </span>
+            {listing.isbn && (
+              <span className="rounded-full border border-border bg-surface px-3 py-1">
+                ISBN {listing.isbn}
+              </span>
+            )}
           </div>
 
           <h2 className="mt-6 font-semibold">Selgers beskrivelse</h2>
@@ -71,8 +74,10 @@ export default async function ListingPage({
                   {listing.seller.name} · {listing.seller.city}
                 </p>
                 <p className="text-muted">
-                  ⭐ {listing.seller.rating.toFixed(1)} ·{" "}
-                  {listing.seller.salesCount} salg · medlem siden{" "}
+                  {listing.seller.salesCount > 0
+                    ? `⭐ ${listing.seller.rating.toFixed(1)} · ${listing.seller.salesCount} salg`
+                    : "Ny selger"}{" "}
+                  · medlem siden{" "}
                   {new Date(listing.seller.memberSince).getFullYear()}
                 </p>
               </div>

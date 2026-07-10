@@ -15,6 +15,13 @@
         {
           "cameraPermission": "Bokfink bruker kameraet til å skanne strekkoden på bøker du vil selge."
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Bokfink trenger tilgang til bildene dine for å legge ved bilde av boken du selger.",
+          "cameraPermission": "Bokfink bruker kameraet til å ta bilde av boken du selger."
+        }
       ]
     ],
     "ios": {

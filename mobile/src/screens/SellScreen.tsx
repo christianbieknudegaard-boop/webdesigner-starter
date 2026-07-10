@@ -12,6 +12,8 @@ import {
   View,
 } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import * as ImagePicker from "expo-image-picker";
+import { Image } from "react-native";
 import {
   BookCondition,
   CATEGORY_LABELS,
@@ -20,6 +22,7 @@ import {
   createListing,
   lookupIsbn,
   searchCatalog,
+  uploadImage,
 } from "../api";
 import { useAuth } from "../AuthContext";
 import { colors } from "../theme";
@@ -32,6 +35,7 @@ export default function SellScreen() {
   const [price, setPrice] = useState("");
   const [condition, setCondition] = useState<BookCondition | null>(null);
   const [category, setCategory] = useState<string | null>(null);
+  const [imageUri, setImageUri] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Boksøk
@@ -98,6 +102,18 @@ export default function SellScreen() {
     setScannerOpen(true);
   }
 
+  async function pickImage(fromCamera: boolean) {
+    const result = fromCamera
+      ? await ImagePicker.launchCameraAsync({ quality: 0.7 })
+      : await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ["images"],
+          quality: 0.7,
+        });
+    if (!result.canceled && result.assets[0]) {
+      setImageUri(result.assets[0].uri);
+    }
+  }
+
   async function submit() {
     if (!title || !author || !price || !condition || !category) {
       Alert.alert(
@@ -108,6 +124,7 @@ export default function SellScreen() {
     }
     setSaving(true);
     try {
+      const imageUrl = imageUri ? await uploadImage(imageUri) : undefined;
       await createListing({
         title,
         author,
@@ -115,6 +132,7 @@ export default function SellScreen() {
         category,
         condition,
         price: Math.round(Number(price)),
+        imageUrl,
       });
       Alert.alert(
         "Annonsen er lagt ut! 🎉",
@@ -126,6 +144,7 @@ export default function SellScreen() {
       setPrice("");
       setCondition(null);
       setCategory(null);
+      setImageUri(null);
       setLookupMessage(null);
     } catch (e) {
       Alert.alert(
@@ -304,6 +323,31 @@ export default function SellScreen() {
           ))}
         </View>
 
+        <Text style={styles.label}>Bilde av boken (valgfritt)</Text>
+        <View style={styles.imageRow}>
+          <Pressable style={styles.imageButton} onPress={() => pickImage(true)}>
+            <Text style={styles.imageButtonText}>📷 Ta bilde</Text>
+          </Pressable>
+          <Pressable
+            style={styles.imageButton}
+            onPress={() => pickImage(false)}
+          >
+            <Text style={styles.imageButtonText}>🖼️ Velg fra galleri</Text>
+          </Pressable>
+        </View>
+        {imageUri && (
+          <View style={styles.imagePreviewRow}>
+            <Image
+              source={{ uri: imageUri }}
+              style={styles.imagePreview}
+              alt="Forhåndsvisning av bokbildet"
+            />
+            <Pressable onPress={() => setImageUri(null)}>
+              <Text style={styles.imageRemove}>Fjern bildet</Text>
+            </Pressable>
+          </View>
+        )}
+
         <Pressable
           style={[styles.submit, saving && { opacity: 0.6 }]}
           onPress={submit}
@@ -380,6 +424,31 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     color: colors.foreground,
   },
+  imageRow: { flexDirection: "row", gap: 8 },
+  imageButton: {
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  imageButtonText: { color: colors.brand, fontWeight: "600", fontSize: 13 },
+  imagePreviewRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 10,
+  },
+  imagePreview: {
+    width: 72,
+    height: 100,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  imageRemove: { color: colors.accent, fontWeight: "600", fontSize: 13 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {
     borderColor: colors.border,

@@ -1,17 +1,41 @@
+import Image from "next/image";
+
 interface BookCoverProps {
   title: string;
   author: string;
   color: string;
+  imageUrl?: string;
   className?: string;
 }
 
-/** Placeholder book cover rendered from title/author until real photos are wired up. */
+/**
+ * Bokomslag: viser opplastet bilde når det finnes, ellers et generert
+ * omslag fra tittel/forfatter og farge.
+ */
 export default function BookCover({
   title,
   author,
   color,
+  imageUrl,
   className = "",
 }: BookCoverProps) {
+  if (imageUrl) {
+    return (
+      <div
+        className={`relative aspect-[2/3] overflow-hidden rounded-lg bg-border ${className}`}
+      >
+        <Image
+          src={imageUrl}
+          alt={`${title} av ${author}`}
+          fill
+          unoptimized
+          className="object-cover"
+          sizes="(max-width: 640px) 50vw, 300px"
+        />
+      </div>
+    );
+  }
+
   return (
     <div
       className={`flex aspect-[2/3] flex-col justify-between rounded-lg p-3 text-white shadow-inner ${className}`}

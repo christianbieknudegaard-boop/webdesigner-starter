@@ -2,23 +2,32 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   RefreshControl,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
-import { CONDITION_LABELS, Listing, fetchListings } from "../api";
+import { BASE_URL, CONDITION_LABELS, Listing, fetchListings } from "../api";
 import { colors } from "../theme";
 
 function ListingRow({ listing }: { listing: Listing }) {
   return (
     <View style={styles.card}>
-      <View style={[styles.cover, { backgroundColor: listing.coverColor }]}>
-        <Text style={styles.coverTitle} numberOfLines={3}>
-          {listing.title}
-        </Text>
-      </View>
+      {listing.imageUrl ? (
+        <Image
+          source={{ uri: new URL(listing.imageUrl, BASE_URL).toString() }}
+          style={styles.cover}
+          alt={`${listing.title} av ${listing.author}`}
+        />
+      ) : (
+        <View style={[styles.cover, { backgroundColor: listing.coverColor }]}>
+          <Text style={styles.coverTitle} numberOfLines={3}>
+            {listing.title}
+          </Text>
+        </View>
+      )}
       <View style={styles.cardBody}>
         <Text style={styles.title} numberOfLines={2}>
           {listing.title}
