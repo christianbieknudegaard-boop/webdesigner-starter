@@ -147,6 +147,19 @@ export async function createListing(input: NewListing): Promise<Listing> {
   return data.listing;
 }
 
+/** Kjøper en bok. Kaster med serverens feilmelding hvis kjøpet avvises. */
+export async function buyListing(listingId: string): Promise<void> {
+  const res = await fetch(new URL("/api/orders", BASE_URL).toString(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ listingId }),
+  });
+  if (!res.ok) {
+    const data = (await res.json()) as { error?: string };
+    throw new Error(data.error ?? `API-feil: ${res.status}`);
+  }
+}
+
 export interface Profile {
   id: string;
   name: string;

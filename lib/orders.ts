@@ -1,0 +1,108 @@
+import { prisma } from "@/lib/db";
+
+export const SHIPPING_PRICE = 45;
+
+export type OrderStatus = "kjopt" | "sendt" | "levert";
+
+export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
+  kjopt: "Kjøpt – venter på sending",
+  sendt: "Sendt",
+  levert: "Levert",
+};
+
+export class OrderError extends Error {
+  constructor(
+    message: string,
+    public status: number
+  ) {
+    super(message);
+  }
+}
+
+/** Kjøper en annonse: oppretter ordre og markerer boken som solgt. */
+export async function createOrder(listingId: string, buyerId: string) {
+  return prisma.$transaction(async (tx) => {
+    const listing = await tx.listing.findUnique({ where: { id: listingId } });
+    if (!listing) throw new OrderError("Fant ikke annonsen", 404);
+    if (listing.sold) throw new OrderError("Boken er allerede solgt", 409);
+    if (listing.sellerId === buyerId)
+      throw new OrderError("Du kan ikke kjøpe din egen bok", 400);
+
+    await tx.listing.update({
+      where: { id: listingId },
+      data: { sold: true },
+    });
+    return tx.order.create({
+      data: {
+        listingId,
+        buyerId,
+        itemPrice: listing.price,
+        shippingPrice: SHIPPING_PRICE,
+      },
+      include: { listing: true },
+    });
+  });
+}
+
+/**
+ * Statusflyt: selgeren merker "sendt", kjøperen bekrefter "levert".
+ * Ved levert øker selgerens salgsteller.
+ */
+export async function updateOrderStatus(
+  orderId: string,
+  newStatus: string,
+  actorId: string
+) {
+  return prisma.$transaction(async (tx) => {
+    const order = await tx.order.findUnique({
+      where: { id: orderId },
+      include: { listing: true },
+    });
+    if (!order) throw new OrderError("Fant ikke ordren", 404);
+
+    const isSeller = order.listing.sellerId === actorId;
+    const isBuyer = order.buyerId === actorId;
+
+    if (newStatus === "sendt") {
+      if (!isSeller)
+        throw new OrderError("Bare selgeren kan merke ordren som sendt", 403);
+      if (order.status !== "kjopt")
+        throw new OrderError("Ordren kan ikke merkes som sendt nå", 409);
+    } else if (newStatus === "levert") {
+      if (!isBuyer)
+        throw new OrderError("Bare kjøperen kan bekrefte mottak", 403);
+      if (order.status !== "sendt")
+        throw new OrderError("Ordren er ikke sendt ennå", 409);
+      await tx.seller.update({
+        where: { id: order.listing.sellerId },
+        data: { salesCount: { increment: 1 } },
+      });
+    } else {
+      throw new OrderError("Ugyldig status", 400);
+    }
+
+    return tx.order.update({
+      where: { id: orderId },
+      data: { status: newStatus },
+      include: { listing: true },
+    });
+  });
+}
+
+/** Ordrer der brukeren er kjøper, nyeste først. */
+export function getPurchases(buyerId: string) {
+  return prisma.order.findMany({
+    where: { buyerId },
+    include: { listing: { include: { seller: true } } },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+/** Ordrer på brukerens egne annonser, nyeste først. */
+export function getSales(sellerId: string) {
+  return prisma.order.findMany({
+    where: { listing: { sellerId } },
+    include: { listing: true, buyer: true },
+    orderBy: { createdAt: "desc" },
+  });
+}

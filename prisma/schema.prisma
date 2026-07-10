@@ -21,6 +21,7 @@ model Seller {
   memberSince  DateTime  @default(now())
   listings     Listing[]
   sessions     Session[]
+  purchases    Order[]   @relation("BuyerOrders")
 }
 
 model Session {
@@ -49,6 +50,24 @@ model Listing {
   createdAt     DateTime @default(now())
   seller        Seller   @relation(fields: [sellerId], references: [id])
   sellerId      String
+  order         Order?
 
   @@index([category, sold])
+}
+
+// Kjøp av en annonse. Betaling kobles på senere (Vipps/Stripe);
+// statusflyten er kjopt -> sendt -> levert.
+model Order {
+  id            String   @id @default(cuid())
+  listing       Listing  @relation(fields: [listingId], references: [id])
+  listingId     String   @unique
+  buyer         Seller   @relation("BuyerOrders", fields: [buyerId], references: [id])
+  buyerId       String
+  status        String   @default("kjopt")
+  itemPrice     Int
+  shippingPrice Int      @default(45)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([buyerId])
 }

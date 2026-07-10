@@ -1,20 +1,39 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
+  Modal,
+  Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
-import { BASE_URL, CONDITION_LABELS, Listing, fetchListings } from "../api";
+import {
+  BASE_URL,
+  CONDITION_LABELS,
+  Listing,
+  buyListing,
+  fetchListings,
+} from "../api";
+import { useAuth } from "../AuthContext";
 import { colors } from "../theme";
 
-function ListingRow({ listing }: { listing: Listing }) {
+const SHIPPING_PRICE = 45;
+
+function ListingRow({
+  listing,
+  onPress,
+}: {
+  listing: Listing;
+  onPress: () => void;
+}) {
   return (
-    <View style={styles.card}>
+    <Pressable style={styles.card} onPress={onPress}>
       {listing.imageUrl ? (
         <Image
           source={{ uri: new URL(listing.imageUrl, BASE_URL).toString() }}
@@ -44,13 +63,129 @@ function ListingRow({ listing }: { listing: Listing }) {
           {listing.seller.rating.toFixed(1)}
         </Text>
       </View>
-    </View>
+    </Pressable>
+  );
+}
+
+function ListingDetail({
+  listing,
+  onClose,
+  onBought,
+}: {
+  listing: Listing;
+  onClose: () => void;
+  onBought: () => void;
+}) {
+  const { user } = useAuth();
+  const [buying, setBuying] = useState(false);
+  const isOwn = user?.id === listing.seller.id;
+
+  async function buy() {
+    if (!user) {
+      Alert.alert(
+        "Logg inn først",
+        "Gå til «Min side»-fanen for å logge inn eller opprette konto."
+      );
+      return;
+    }
+    setBuying(true);
+    try {
+      await buyListing(listing.id);
+      Alert.alert(
+        "Boken er din! 🎉",
+        "Selgeren får beskjed og sender boken. Betaling kommer i neste versjon."
+      );
+      onBought();
+    } catch (e) {
+      Alert.alert(
+        "Kjøpet feilet",
+        e instanceof Error ? e.message : "Prøv igjen."
+      );
+    } finally {
+      setBuying(false);
+    }
+  }
+
+  return (
+    <Modal visible animationType="slide" onRequestClose={onClose}>
+      <ScrollView
+        style={styles.detail}
+        contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
+      >
+        <Pressable onPress={onClose}>
+          <Text style={styles.detailClose}>‹ Tilbake</Text>
+        </Pressable>
+
+        {listing.imageUrl ? (
+          <Image
+            source={{ uri: new URL(listing.imageUrl, BASE_URL).toString() }}
+            style={styles.detailCover}
+            alt={`${listing.title} av ${listing.author}`}
+          />
+        ) : (
+          <View
+            style={[styles.detailCover, { backgroundColor: listing.coverColor }]}
+          >
+            <Text style={styles.detailCoverTitle}>{listing.title}</Text>
+          </View>
+        )}
+
+        <Text style={styles.detailTitle}>{listing.title}</Text>
+        <Text style={styles.detailAuthor}>{listing.author}</Text>
+        <Text style={styles.condition}>
+          {CONDITION_LABELS[listing.condition]}
+        </Text>
+
+        {listing.description ? (
+          <Text style={styles.detailDescription}>{listing.description}</Text>
+        ) : null}
+
+        <Text style={styles.seller}>
+          Selges av {listing.seller.name} ({listing.seller.city}) ·{" "}
+          {listing.seller.salesCount > 0
+            ? `⭐ ${listing.seller.rating.toFixed(1)} · ${listing.seller.salesCount} salg`
+            : "Ny selger"}
+        </Text>
+
+        <View style={styles.priceBox}>
+          <View style={styles.priceRow}>
+            <Text style={styles.priceLabel}>Boken</Text>
+            <Text style={styles.priceValue}>{listing.price} kr</Text>
+          </View>
+          <View style={styles.priceRow}>
+            <Text style={styles.priceLabel}>Frakt med sporing</Text>
+            <Text style={styles.priceValue}>{SHIPPING_PRICE} kr</Text>
+          </View>
+          <View style={[styles.priceRow, styles.priceTotalRow]}>
+            <Text style={styles.priceTotal}>Totalt</Text>
+            <Text style={styles.priceTotal}>
+              {listing.price + SHIPPING_PRICE} kr
+            </Text>
+          </View>
+        </View>
+
+        {isOwn ? (
+          <Text style={styles.ownNotice}>Dette er din egen annonse.</Text>
+        ) : (
+          <Pressable
+            style={[styles.buyButton, buying && { opacity: 0.6 }]}
+            onPress={buy}
+            disabled={buying}
+          >
+            <Text style={styles.buyButtonText}>
+              {buying ? "Kjøper …" : "Kjøp nå"}
+            </Text>
+          </Pressable>
+        )}
+      </ScrollView>
+    </Modal>
   );
 }
 
 export default function HomeScreen() {
   const [query, setQuery] = useState("");
   const [listings, setListings] = useState<Listing[]>([]);
+  const [selected, setSelected] = useState<Listing | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -91,7 +226,9 @@ export default function HomeScreen() {
         <FlatList
           data={listings}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <ListingRow listing={item} />}
+          renderItem={({ item }) => (
+            <ListingRow listing={item} onPress={() => setSelected(item)} />
+          )}
           contentContainerStyle={{ paddingBottom: 24 }}
           refreshControl={
             <RefreshControl
@@ -105,6 +242,16 @@ export default function HomeScreen() {
           ListEmptyComponent={
             <Text style={styles.empty}>Ingen bøker matchet søket.</Text>
           }
+        />
+      )}
+      {selected && (
+        <ListingDetail
+          listing={selected}
+          onClose={() => setSelected(null)}
+          onBought={() => {
+            setSelected(null);
+            load(query);
+          }}
         />
       )}
     </View>
@@ -169,4 +316,63 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   empty: { marginTop: 40, textAlign: "center", color: colors.muted },
+  detail: { flex: 1, backgroundColor: colors.background },
+  detailClose: {
+    color: colors.brand,
+    fontWeight: "700",
+    fontSize: 16,
+    marginBottom: 14,
+  },
+  detailCover: {
+    width: 160,
+    height: 240,
+    borderRadius: 12,
+    alignSelf: "center",
+    padding: 12,
+  },
+  detailCoverTitle: { color: "#fff", fontWeight: "800", fontSize: 15 },
+  detailTitle: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: colors.brandDark,
+    marginTop: 16,
+  },
+  detailAuthor: { color: colors.muted, fontSize: 16, marginTop: 2 },
+  detailDescription: {
+    color: colors.foreground,
+    marginTop: 12,
+    lineHeight: 21,
+  },
+  priceBox: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    marginTop: 16,
+    gap: 6,
+  },
+  priceRow: { flexDirection: "row", justifyContent: "space-between" },
+  priceLabel: { color: colors.muted },
+  priceValue: { color: colors.foreground },
+  priceTotalRow: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 6,
+  },
+  priceTotal: { fontWeight: "800", color: colors.brandDark },
+  ownNotice: {
+    marginTop: 16,
+    textAlign: "center",
+    color: colors.muted,
+    fontWeight: "600",
+  },
+  buyButton: {
+    backgroundColor: colors.accent,
+    borderRadius: 24,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginTop: 16,
+  },
+  buyButtonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
 });

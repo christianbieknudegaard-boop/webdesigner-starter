@@ -1,8 +1,15 @@
 import { redirect } from "next/navigation";
 import ListingCard from "@/components/ListingCard";
 import LogoutButton from "@/components/LogoutButton";
+import OrderCard, { OrderView } from "@/components/OrderCard";
 import { getCurrentSeller } from "@/lib/auth";
 import { searchListings } from "@/lib/data";
+import {
+  ORDER_STATUS_LABELS,
+  OrderStatus,
+  getPurchases,
+  getSales,
+} from "@/lib/orders";
 
 export const metadata = {
   title: "Min side",
@@ -14,13 +21,39 @@ export default async function ProfilePage() {
   const seller = await getCurrentSeller();
   if (!seller) redirect("/logg-inn");
 
-  const all = await searchListings({
-    includeSold: true,
-    sellerId: seller.id,
-  });
+  const [all, purchases, sales] = await Promise.all([
+    searchListings({ includeSold: true, sellerId: seller.id }),
+    getPurchases(seller.id),
+    getSales(seller.id),
+  ]);
   const active = all.filter((l) => !l.sold);
   const sold = all.filter((l) => l.sold);
-  const earned = sold.reduce((sum, l) => sum + l.price, 0);
+  const earned = sales
+    .filter((o) => o.status === "levert")
+    .reduce((sum, o) => sum + o.itemPrice, 0);
+
+  const purchaseViews: OrderView[] = purchases.map((o) => ({
+    id: o.id,
+    listingId: o.listingId,
+    title: o.listing.title,
+    author: o.listing.author,
+    counterpartLabel: `Selger: ${o.listing.seller.name}`,
+    status: o.status,
+    statusLabel: ORDER_STATUS_LABELS[o.status as OrderStatus] ?? o.status,
+    totalPrice: o.itemPrice + o.shippingPrice,
+    createdAt: o.createdAt.toISOString(),
+  }));
+  const saleViews: OrderView[] = sales.map((o) => ({
+    id: o.id,
+    listingId: o.listingId,
+    title: o.listing.title,
+    author: o.listing.author,
+    counterpartLabel: `Kjøper: ${o.buyer.name}`,
+    status: o.status,
+    statusLabel: ORDER_STATUS_LABELS[o.status as OrderStatus] ?? o.status,
+    totalPrice: o.itemPrice,
+    createdAt: o.createdAt.toISOString(),
+  }));
 
   return (
     <div>
@@ -60,6 +93,32 @@ export default async function ProfilePage() {
           <p className="mt-1 text-2xl font-bold text-brand-dark">{earned} kr</p>
         </div>
       </div>
+
+      {purchaseViews.length > 0 && (
+        <section className="mt-10">
+          <h2 className="text-2xl font-bold text-brand-dark">
+            Mine kjøp ({purchaseViews.length})
+          </h2>
+          <div className="mt-4 space-y-3">
+            {purchaseViews.map((o) => (
+              <OrderCard key={o.id} order={o} role="buyer" />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {saleViews.length > 0 && (
+        <section className="mt-10">
+          <h2 className="text-2xl font-bold text-brand-dark">
+            Mine salg ({saleViews.length})
+          </h2>
+          <div className="mt-4 space-y-3">
+            {saleViews.map((o) => (
+              <OrderCard key={o.id} order={o} role="seller" />
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="mt-10">
         <h2 className="text-2xl font-bold text-brand-dark">

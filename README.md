@@ -26,6 +26,9 @@ nettleseren («Legg til på hjemskjerm»).
 - 🙋 Min side med aktive annonser, solgte bøker og statistikk
 - 🖼️ Bildeopplasting: ta bilde av boken (kamera/galleri på mobil, filvelger
   på nett) – vises i annonsekort og på annonsesiden
+- 🛒 Kjøpsflyt: «Kjøp nå» med pris + frakt, boken reserveres og merkes
+  solgt; selger merker «sendt», kjøper bekrefter «mottatt» på Min side
+  (selve betalingen kobles på når Vipps/Stripe-avtale er klar)
 - 🔌 REST-API (`/api/listings`) som mobilappen bruker
 - 📱 Mobilapp med Hjem (søk/liste), Selg og Min side
 
@@ -84,7 +87,8 @@ mobile/         Expo-appen
 
 1. **Vipps Login** – i tillegg til e-post/passord (krever Vipps-avtale);
    mobilappen bør også lagre sesjonen med expo-secure-store
-2. **Betaling** – Vipps/Stripe med pengene i forvaring til levert bok
+2. **Betaling** – koble Vipps/Stripe på kjøpsflyten, med pengene i
+   forvaring til levert bok
 3. **Frakt** – ferdig frankert etikett via Posten/Helthjem-API
 4. **Bildelagring i skyen** – opplastede bilder ligger i dag i `uploads/`
    på serveren; bytt `lib/storage.ts` til Vercel Blob/S3 ved deploy på

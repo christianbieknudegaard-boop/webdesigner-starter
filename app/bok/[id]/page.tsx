@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import BookCover from "@/components/BookCover";
+import BuyButton from "@/components/BuyButton";
 import ListingCard from "@/components/ListingCard";
+import { getCurrentSeller } from "@/lib/auth";
 import { getListing, searchListings } from "@/lib/data";
+import { SHIPPING_PRICE } from "@/lib/orders";
 import { CATEGORY_LABELS, CONDITION_LABELS } from "@/types/marketplace";
 
 export default async function ListingPage({
@@ -11,8 +14,12 @@ export default async function ListingPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const listing = await getListing(id);
+  const [listing, currentSeller] = await Promise.all([
+    getListing(id),
+    getCurrentSeller(),
+  ]);
   if (!listing) notFound();
+  const isOwn = currentSeller?.id === listing.sellerId;
 
   const savings =
     listing.originalPrice != null
@@ -104,18 +111,22 @@ export default async function ListingPage({
               )}
             </p>
           )}
-          <button
-            disabled={listing.sold}
-            className="mt-4 w-full rounded-full bg-accent py-3 font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Kjøp nå
-          </button>
-          <button
-            disabled={listing.sold}
-            className="mt-2 w-full rounded-full border border-brand py-3 font-semibold text-brand transition hover:bg-brand-light disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Gi et bud
-          </button>
+          {listing.sold ? null : isOwn ? (
+            <p className="mt-4 rounded-xl bg-brand-light px-4 py-3 text-sm font-medium text-brand-dark">
+              Dette er din annonse. Du finner den på{" "}
+              <Link href="/profil" className="underline">
+                Min side
+              </Link>
+              .
+            </p>
+          ) : (
+            <BuyButton
+              listingId={listing.id}
+              price={listing.price}
+              shippingPrice={SHIPPING_PRICE}
+              loggedIn={currentSeller != null}
+            />
+          )}
           <ul className="mt-4 space-y-1 text-xs text-muted">
             <li>✓ Pengene holdes trygt til boken er levert</li>
             <li>✓ Frakt fra 45 kr med sporing</li>
