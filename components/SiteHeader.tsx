@@ -1,13 +1,12 @@
 import Link from "next/link";
+import Logo from "@/components/Logo";
 
 export default function SiteHeader() {
   return (
     <header className="sticky top-0 z-20 border-b border-border bg-surface/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
         <Link href="/" className="flex items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand text-lg text-white">
-            📖
-          </span>
+          <Logo size={36} />
           <span className="text-xl font-bold tracking-tight text-brand-dark">
             Bokfink
           </span>

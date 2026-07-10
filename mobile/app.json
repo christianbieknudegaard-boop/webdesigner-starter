@@ -5,6 +5,7 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "scheme": "bokfink",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "backgroundColor": "#faf7f2",
     "primaryColor": "#2f5d50",
@@ -23,6 +24,7 @@
     "android": {
       "package": "no.bokfink.app",
       "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#2f5d50"
       }
     }

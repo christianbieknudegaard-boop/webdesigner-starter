@@ -1,11 +1,14 @@
 import Link from "next/link";
+import Logo from "@/components/Logo";
 
 export default function SiteFooter() {
   return (
     <footer className="mt-16 border-t border-border bg-surface">
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:grid-cols-3">
         <div>
-          <p className="text-lg font-bold text-brand-dark">📖 Bokfink</p>
+          <p className="flex items-center gap-2 text-lg font-bold text-brand-dark">
+            <Logo size={28} /> Bokfink
+          </p>
           <p className="mt-2 text-sm text-muted">
             Norges hyggeligste markedsplass for brukte bøker. Kjøp og selg
             trygt, spar penger og gi bøkene et nytt liv.

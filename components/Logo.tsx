@@ -1,0 +1,47 @@
+/**
+ * Bokfink-logoen: en bokfink (cream kropp, rustoransje bryst) der vingen er
+ * en åpen bok. `variant="icon"` gir den grønne app-ikon-bakgrunnen.
+ */
+export default function Logo({
+  size = 36,
+  variant = "icon",
+}: {
+  size?: number;
+  variant?: "icon" | "plain";
+}) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 512 512"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      {variant === "icon" && (
+        <rect width="512" height="512" rx="112" fill="#2f5d50" />
+      )}
+      <defs>
+        <clipPath id="bokfink-body">
+          <path d="M 408 224 L 356 202 C 348 162, 312 140, 276 142 C 232 144, 202 168, 193 196 L 92 170 C 84 168, 78 176, 84 182 L 178 262 C 172 300, 195 350, 250 362 C 315 376, 366 330, 370 268 C 370 254, 368 242, 364 232 Z" />
+        </clipPath>
+      </defs>
+      <path
+        fill="#faf7f2"
+        stroke={variant === "plain" ? "#2f5d50" : "none"}
+        strokeWidth={variant === "plain" ? 14 : 0}
+        d="M 408 224 L 356 202 C 348 162, 312 140, 276 142 C 232 144, 202 168, 193 196 L 92 170 C 84 168, 78 176, 84 182 L 178 262 C 172 300, 195 350, 250 362 C 315 376, 366 330, 370 268 C 370 254, 368 242, 364 232 Z"
+      />
+      <g clipPath="url(#bokfink-body)">
+        <path
+          fill="#d97941"
+          d="M 500 150 L 500 420 L 150 420 C 235 360 280 250 287 130 Z"
+        />
+      </g>
+      <g fill="#2f5d50">
+        <path d="M 238 302 C 216 284 190 279 172 285 L 172 236 C 190 230 216 237 238 255 Z" />
+        <path d="M 246 302 C 268 284 294 279 312 285 L 312 236 C 294 230 268 237 246 255 Z" />
+      </g>
+      <circle cx="330" cy="196" r="13" fill="#1f2421" />
+    </svg>
+  );
+}
