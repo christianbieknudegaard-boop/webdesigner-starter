@@ -29,6 +29,8 @@ nettleseren («Legg til på hjemskjerm»).
 - 🛒 Kjøpsflyt: «Kjøp nå» med pris + frakt, boken reserveres og merkes
   solgt; selger merker «sendt», kjøper bekrefter «mottatt» på Min side
   (selve betalingen kobles på når Vipps/Stripe-avtale er klar)
+- 💬 Meldinger: spør selgeren direkte fra annonsen, svar i trådvisning,
+  uleste-merke i menyen – egen fane i mobilappen
 - 🔌 REST-API (`/api/listings`) som mobilappen bruker
 - 📱 Mobilapp med Hjem (søk/liste), Selg og Min side
 
@@ -94,7 +96,6 @@ mobile/         Expo-appen
 3. **Frakt** – ferdig frankert etikett via Posten/Helthjem-API
 4. **Bokkatalog** – utvid `lib/catalog.ts` til en ekte bokdatabase
    (f.eks. Bokbasen) i stedet for demodata + Google Books
-5. **Meldinger** – chat mellom kjøper og selger
-6. **E-postverifisering og glemt passord**
+5. **E-postverifisering og glemt passord**
 7. **App-butikkene** – bygg og publiser Expo-appen via EAS
    (se [DEPLOY.md](DEPLOY.md))

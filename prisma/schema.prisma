@@ -21,7 +21,9 @@ model Seller {
   memberSince  DateTime  @default(now())
   listings     Listing[]
   sessions     Session[]
-  purchases    Order[]   @relation("BuyerOrders")
+  purchases    Order[]        @relation("BuyerOrders")
+  conversations Conversation[] @relation("BuyerConversations")
+  messages     Message[]
 }
 
 model Session {
@@ -51,8 +53,37 @@ model Listing {
   seller        Seller   @relation(fields: [sellerId], references: [id])
   sellerId      String
   order         Order?
+  conversations Conversation[]
 
   @@index([category, sold])
+}
+
+// Samtale om en annonse mellom en interessent ("buyer") og selgeren.
+model Conversation {
+  id        String    @id @default(cuid())
+  listing   Listing   @relation(fields: [listingId], references: [id])
+  listingId String
+  buyer     Seller    @relation("BuyerConversations", fields: [buyerId], references: [id])
+  buyerId   String
+  messages  Message[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([listingId, buyerId])
+  @@index([buyerId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationId String
+  sender         Seller       @relation(fields: [senderId], references: [id])
+  senderId       String
+  body           String
+  read           Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
 }
 
 // Kjøp av en annonse. Betaling kobles på senere (Vipps/Stripe);

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import BookCover from "@/components/BookCover";
 import BuyButton from "@/components/BuyButton";
 import ListingCard from "@/components/ListingCard";
+import MessageSellerButton from "@/components/MessageSellerButton";
 import { getCurrentSeller } from "@/lib/auth";
 import { getListing, searchListings } from "@/lib/data";
 import { SHIPPING_PRICE } from "@/lib/orders";
@@ -120,12 +121,19 @@ export default async function ListingPage({
               .
             </p>
           ) : (
-            <BuyButton
-              listingId={listing.id}
-              price={listing.price}
-              shippingPrice={SHIPPING_PRICE}
-              loggedIn={currentSeller != null}
-            />
+            <>
+              <BuyButton
+                listingId={listing.id}
+                price={listing.price}
+                shippingPrice={SHIPPING_PRICE}
+                loggedIn={currentSeller != null}
+              />
+              <MessageSellerButton
+                listingId={listing.id}
+                sellerName={listing.seller.name}
+                loggedIn={currentSeller != null}
+              />
+            </>
           )}
           <ul className="mt-4 space-y-1 text-xs text-muted">
             <li>✓ Pengene holdes trygt til boken er levert</li>

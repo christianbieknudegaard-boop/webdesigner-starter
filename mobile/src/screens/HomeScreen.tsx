@@ -19,6 +19,7 @@ import {
   Listing,
   buyListing,
   fetchListings,
+  startChat,
 } from "../api";
 import { useAuth } from "../AuthContext";
 import { colors } from "../theme";
@@ -78,7 +79,37 @@ function ListingDetail({
 }) {
   const { user } = useAuth();
   const [buying, setBuying] = useState(false);
+  const [question, setQuestion] = useState("");
+  const [asking, setAsking] = useState(false);
   const isOwn = user?.id === listing.seller.id;
+
+  async function ask() {
+    if (!user) {
+      Alert.alert(
+        "Logg inn først",
+        "Gå til «Min side»-fanen for å logge inn eller opprette konto."
+      );
+      return;
+    }
+    const body = question.trim();
+    if (!body) return;
+    setAsking(true);
+    try {
+      await startChat(listing.id, body);
+      setQuestion("");
+      Alert.alert(
+        "Melding sendt! 💬",
+        "Du finner samtalen under Meldinger-fanen."
+      );
+    } catch (e) {
+      Alert.alert(
+        "Meldingen ble ikke sendt",
+        e instanceof Error ? e.message : "Prøv igjen."
+      );
+    } finally {
+      setAsking(false);
+    }
+  }
 
   async function buy() {
     if (!user) {
@@ -167,15 +198,37 @@ function ListingDetail({
         {isOwn ? (
           <Text style={styles.ownNotice}>Dette er din egen annonse.</Text>
         ) : (
-          <Pressable
-            style={[styles.buyButton, buying && { opacity: 0.6 }]}
-            onPress={buy}
-            disabled={buying}
-          >
-            <Text style={styles.buyButtonText}>
-              {buying ? "Kjøper …" : "Kjøp nå"}
-            </Text>
-          </Pressable>
+          <>
+            <Pressable
+              style={[styles.buyButton, buying && { opacity: 0.6 }]}
+              onPress={buy}
+              disabled={buying}
+            >
+              <Text style={styles.buyButtonText}>
+                {buying ? "Kjøper …" : "Kjøp nå"}
+              </Text>
+            </Pressable>
+
+            <View style={styles.askBox}>
+              <TextInput
+                style={styles.askInput}
+                placeholder="Spør selgeren om noe …"
+                placeholderTextColor={colors.muted}
+                value={question}
+                onChangeText={setQuestion}
+              />
+              <Pressable
+                style={[
+                  styles.askButton,
+                  (asking || !question.trim()) && { opacity: 0.5 },
+                ]}
+                onPress={ask}
+                disabled={asking || !question.trim()}
+              >
+                <Text style={styles.askButtonText}>💬</Text>
+              </Pressable>
+            </View>
+          </>
         )}
       </ScrollView>
     </Modal>
@@ -375,4 +428,22 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   buyButtonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  askBox: { flexDirection: "row", gap: 8, marginTop: 12 },
+  askInput: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    color: colors.foreground,
+  },
+  askButton: {
+    backgroundColor: colors.brand,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    justifyContent: "center",
+  },
+  askButtonText: { fontSize: 18 },
 });

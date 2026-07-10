@@ -4,6 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import { Text } from "react-native";
 import HomeScreen from "./src/screens/HomeScreen";
 import SellScreen from "./src/screens/SellScreen";
+import MessagesScreen from "./src/screens/MessagesScreen";
 import ProfileScreen from "./src/screens/ProfileScreen";
 import { AuthProvider } from "./src/AuthContext";
 import { colors } from "./src/theme";
@@ -13,6 +14,12 @@ const Tab = createBottomTabNavigator();
 const TABS = [
   { name: "Hjem", component: HomeScreen, icon: "📚", title: "Bokfink" },
   { name: "Selg", component: SellScreen, icon: "🏷️", title: "Selg en bok" },
+  {
+    name: "Meldinger",
+    component: MessagesScreen,
+    icon: "💬",
+    title: "Meldinger",
+  },
   { name: "Min side", component: ProfileScreen, icon: "👤", title: "Min side" },
 ];
 

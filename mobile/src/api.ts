@@ -160,6 +160,90 @@ export async function buyListing(listingId: string): Promise<void> {
   }
 }
 
+export interface ConversationSummary {
+  id: string;
+  listingId: string;
+  listingTitle: string;
+  counterpartName: string;
+  lastMessage: string;
+  lastMessageAt: string;
+  unreadCount: number;
+}
+
+export interface ThreadMessage {
+  id: string;
+  body: string;
+  mine: boolean;
+  senderName: string;
+  createdAt: string;
+}
+
+export interface ConversationDetail {
+  id: string;
+  listingId: string;
+  listingTitle: string;
+  listingPrice: number;
+  listingSold: boolean;
+  counterpartName: string;
+  messages: ThreadMessage[];
+}
+
+export async function fetchConversations(): Promise<ConversationSummary[]> {
+  const res = await fetch(new URL("/api/meldinger", BASE_URL).toString(), {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error(`API-feil: ${res.status}`);
+  const data = (await res.json()) as { conversations: ConversationSummary[] };
+  return data.conversations;
+}
+
+export async function fetchConversation(
+  id: string
+): Promise<ConversationDetail> {
+  const res = await fetch(
+    new URL(`/api/meldinger/${id}`, BASE_URL).toString(),
+    { headers: authHeaders() }
+  );
+  if (!res.ok) throw new Error(`API-feil: ${res.status}`);
+  const data = (await res.json()) as { conversation: ConversationDetail };
+  return data.conversation;
+}
+
+export async function sendChatMessage(id: string, body: string) {
+  const res = await fetch(
+    new URL(`/api/meldinger/${id}`, BASE_URL).toString(),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ body }),
+    }
+  );
+  if (!res.ok) {
+    const data = (await res.json()) as { error?: string };
+    throw new Error(data.error ?? `API-feil: ${res.status}`);
+  }
+}
+
+/** Starter en samtale om en annonse. Returnerer samtale-ID. */
+export async function startChat(
+  listingId: string,
+  body: string
+): Promise<string> {
+  const res = await fetch(new URL("/api/meldinger", BASE_URL).toString(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ listingId, body }),
+  });
+  const data = (await res.json()) as {
+    conversationId?: string;
+    error?: string;
+  };
+  if (!res.ok || !data.conversationId) {
+    throw new Error(data.error ?? `API-feil: ${res.status}`);
+  }
+  return data.conversationId;
+}
+
 export interface Profile {
   id: string;
   name: string;
