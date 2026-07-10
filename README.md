@@ -32,19 +32,21 @@ nettleseren («Legg til på hjemskjerm»).
 - 🔌 REST-API (`/api/listings`) som mobilappen bruker
 - 📱 Mobilapp med Hjem (søk/liste), Selg og Min side
 
-> Annonser lagres i en ekte database (Prisma). Lokalt brukes SQLite uten
-> noe oppsett; ved lansering bytter du til Postgres (f.eks. Neon eller
-> Supabase) ved å endre `provider` i `prisma/schema.prisma` og
-> `DATABASE_URL`. Innlogging, betaling og bildeopplasting står i
-> veikartet nederst.
+> Annonser lagres i PostgreSQL via Prisma – samme oppsett lokalt og i
+> produksjon. **Klar til deploy: se [DEPLOY.md](DEPLOY.md)** for
+> steg-for-steg-guide (Neon + Vercel + domene + app-butikkene).
 
 ## Kom i gang – nettsiden
 
+Du trenger en PostgreSQL-database: enten lokal Postgres, eller en gratis
+database hos [neon.tech](https://neon.tech) (anbefalt – samme database
+kan senere brukes i produksjon).
+
 ```bash
 npm install
-cp .env.example .env   # DATABASE_URL (SQLite lokalt)
-npm run db:push        # oppretter databasen
-npm run db:seed        # legger inn demodata
+cp .env.example .env   # lim inn din DATABASE_URL
+npm run db:push        # oppretter tabellene
+npm run db:seed        # legger inn demodata (kun lokalt!)
 npm run dev
 ```
 
@@ -90,12 +92,9 @@ mobile/         Expo-appen
 2. **Betaling** – koble Vipps/Stripe på kjøpsflyten, med pengene i
    forvaring til levert bok
 3. **Frakt** – ferdig frankert etikett via Posten/Helthjem-API
-4. **Bildelagring i skyen** – opplastede bilder ligger i dag i `uploads/`
-   på serveren; bytt `lib/storage.ts` til Vercel Blob/S3 ved deploy på
-   serverless
-5. **Bokkatalog** – utvid `lib/catalog.ts` til en ekte bokdatabase
+4. **Bokkatalog** – utvid `lib/catalog.ts` til en ekte bokdatabase
    (f.eks. Bokbasen) i stedet for demodata + Google Books
-6. **Meldinger** – chat mellom kjøper og selger
+5. **Meldinger** – chat mellom kjøper og selger
+6. **E-postverifisering og glemt passord**
 7. **App-butikkene** – bygg og publiser Expo-appen via EAS
-8. **Produksjonsdatabase** – bytt SQLite til Postgres (Neon/Supabase) ved
-   deploy: endre `provider` i `prisma/schema.prisma` og sett `DATABASE_URL`
+   (se [DEPLOY.md](DEPLOY.md))

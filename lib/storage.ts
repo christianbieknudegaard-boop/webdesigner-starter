@@ -3,12 +3,16 @@ import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 
 /**
- * Bildelagring: filer legges i uploads/ (utenfor public/, gitignorert) og
- * serveres via GET /api/bilder/[navn]. Fungerer i dev og på egen server;
- * på serverless (Vercel) byttes dette laget ut med Vercel Blob/S3.
+ * Bildelagring med to drivere:
+ *  - Vercel Blob når BLOB_READ_WRITE_TOKEN er satt (produksjon på Vercel)
+ *  - lokal disk (uploads/, servert via GET /api/bilder/[navn]) ellers
  */
 
 const UPLOAD_DIR = path.join(process.cwd(), "uploads");
+
+function blobEnabled() {
+  return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+}
 
 export const IMAGE_TYPES: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -25,8 +29,19 @@ export async function saveImage(
 ): Promise<string> {
   const ext = IMAGE_TYPES[mimeType];
   if (!ext) throw new Error(`Ustøttet bildetype: ${mimeType}`);
-  await mkdir(UPLOAD_DIR, { recursive: true });
   const name = `${randomBytes(16).toString("hex")}.${ext}`;
+
+  if (blobEnabled()) {
+    const { put } = await import("@vercel/blob");
+    const blob = await put(`bokfink/${name}`, data, {
+      access: "public",
+      contentType: mimeType,
+      addRandomSuffix: false,
+    });
+    return blob.url;
+  }
+
+  await mkdir(UPLOAD_DIR, { recursive: true });
   await writeFile(path.join(UPLOAD_DIR, name), data);
   return `/api/bilder/${name}`;
 }

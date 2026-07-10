@@ -121,9 +121,14 @@ export function validateNewListing(
     !Number.isInteger(input.price)
   )
     return "Prisen må være et positivt heltall i kroner";
-  // Kun bilder lastet opp via vårt eget API godtas.
-  if (input.imageUrl && !/^\/api\/bilder\/[a-f0-9]{32}\.(jpg|png|webp)$/.test(input.imageUrl))
-    return "Ugyldig bilde-URL";
+  // Kun bilder lastet opp via vårt eget API godtas (lokal disk eller
+  // Vercel Blob).
+  const validImage =
+    /^\/api\/bilder\/[a-f0-9]{32}\.(jpg|png|webp)$/.test(input.imageUrl ?? "") ||
+    /^https:\/\/[a-z0-9.-]+\.public\.blob\.vercel-storage\.com\/bokfink\/[a-f0-9]{32}\.(jpg|png|webp)$/.test(
+      input.imageUrl ?? ""
+    );
+  if (input.imageUrl && !validImage) return "Ugyldig bilde-URL";
   return null;
 }
 

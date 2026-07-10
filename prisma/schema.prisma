@@ -1,12 +1,12 @@
-// Bokfink-datamodellen. SQLite lokalt; bytt provider til "postgresql"
-// (og DATABASE_URL) ved lansering – modellene er kompatible.
+// Bokfink-datamodellen. PostgreSQL både lokalt og i produksjon –
+// se DEPLOY.md for oppsett (gratis database hos Neon).
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
