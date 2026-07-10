@@ -14,8 +14,10 @@ import {
 import { CameraView, useCameraPermissions } from "expo-camera";
 import {
   BookCondition,
+  CATEGORY_LABELS,
   CONDITION_LABELS,
   CatalogBook,
+  createListing,
   lookupIsbn,
   searchCatalog,
 } from "../api";
@@ -27,6 +29,8 @@ export default function SellScreen() {
   const [isbn, setIsbn] = useState("");
   const [price, setPrice] = useState("");
   const [condition, setCondition] = useState<BookCondition | null>(null);
+  const [category, setCategory] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   // Boksøk
   const [search, setSearch] = useState("");
@@ -57,6 +61,7 @@ export default function SellScreen() {
     setTitle(book.title);
     setAuthor(book.author);
     setIsbn(book.isbn);
+    if (book.category) setCategory(book.category);
     setSuggestions([]);
     setSearch("");
     setLookupMessage(`Fant «${book.title}» – detaljene er fylt inn.`);
@@ -91,22 +96,43 @@ export default function SellScreen() {
     setScannerOpen(true);
   }
 
-  function submit() {
-    if (!title || !author || !price || !condition) {
-      Alert.alert("Mangler noe", "Fyll inn tittel, forfatter, pris og tilstand.");
+  async function submit() {
+    if (!title || !author || !price || !condition || !category) {
+      Alert.alert(
+        "Mangler noe",
+        "Fyll inn tittel, forfatter, pris, kategori og tilstand."
+      );
       return;
     }
-    // Prototype: annonsen lagres ikke ennå – POST /api/listings kommer.
-    Alert.alert(
-      "Annonsen er klar! 🎉",
-      `«${title}» av ${author} legges ut for ${price} kr. Lagring kommer i neste versjon.`
-    );
-    setTitle("");
-    setAuthor("");
-    setIsbn("");
-    setPrice("");
-    setCondition(null);
-    setLookupMessage(null);
+    setSaving(true);
+    try {
+      await createListing({
+        title,
+        author,
+        isbn: isbn || undefined,
+        category,
+        condition,
+        price: Math.round(Number(price)),
+      });
+      Alert.alert(
+        "Annonsen er lagt ut! 🎉",
+        `«${title}» av ${author} er nå til salgs for ${price} kr.`
+      );
+      setTitle("");
+      setAuthor("");
+      setIsbn("");
+      setPrice("");
+      setCondition(null);
+      setCategory(null);
+      setLookupMessage(null);
+    } catch (e) {
+      Alert.alert(
+        "Noe gikk galt",
+        e instanceof Error ? e.message : "Prøv igjen."
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -223,6 +249,26 @@ export default function SellScreen() {
           keyboardType="numeric"
         />
 
+        <Text style={styles.label}>Kategori</Text>
+        <View style={styles.chips}>
+          {Object.keys(CATEGORY_LABELS).map((cat) => (
+            <Pressable
+              key={cat}
+              onPress={() => setCategory(cat)}
+              style={[styles.chip, category === cat && styles.chipActive]}
+            >
+              <Text
+                style={[
+                  styles.chipText,
+                  category === cat && styles.chipTextActive,
+                ]}
+              >
+                {CATEGORY_LABELS[cat]}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
         <Text style={styles.label}>Tilstand</Text>
         <View style={styles.chips}>
           {(Object.keys(CONDITION_LABELS) as BookCondition[]).map((c) => (
@@ -243,8 +289,14 @@ export default function SellScreen() {
           ))}
         </View>
 
-        <Pressable style={styles.submit} onPress={submit}>
-          <Text style={styles.submitText}>Legg ut annonsen</Text>
+        <Pressable
+          style={[styles.submit, saving && { opacity: 0.6 }]}
+          onPress={submit}
+          disabled={saving}
+        >
+          <Text style={styles.submitText}>
+            {saving ? "Legger ut …" : "Legg ut annonsen"}
+          </Text>
         </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>

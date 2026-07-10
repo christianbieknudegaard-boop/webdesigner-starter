@@ -1,0 +1,40 @@
+// Bokfink-datamodellen. SQLite lokalt; bytt provider til "postgresql"
+// (og DATABASE_URL) ved lansering – modellene er kompatible.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Seller {
+  id          String    @id @default(cuid())
+  name        String
+  city        String
+  rating      Float     @default(0)
+  salesCount  Int       @default(0)
+  memberSince DateTime  @default(now())
+  listings    Listing[]
+}
+
+model Listing {
+  id            String   @id @default(cuid())
+  title         String
+  author        String
+  isbn          String   @default("")
+  category      String
+  condition     String
+  price         Int
+  originalPrice Int?
+  description   String   @default("")
+  coverColor    String
+  sold          Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  seller        Seller   @relation(fields: [sellerId], references: [id])
+  sellerId      String
+
+  @@index([category, sold])
+}

@@ -11,14 +11,14 @@ export default async function ListingPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const listing = getListing(id);
+  const listing = await getListing(id);
   if (!listing) notFound();
 
   const savings =
     listing.originalPrice != null
       ? Math.round((1 - listing.price / listing.originalPrice) * 100)
       : null;
-  const related = searchListings({ category: listing.category })
+  const related = (await searchListings({ category: listing.category }))
     .filter((l) => l.id !== listing.id)
     .slice(0, 4);
 

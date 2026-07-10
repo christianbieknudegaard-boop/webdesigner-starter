@@ -1,18 +1,19 @@
 import ListingCard from "@/components/ListingCard";
-import { SELLERS, searchListings } from "@/lib/data";
+import { getDemoSeller, searchListings } from "@/lib/data";
 
 export const metadata = {
   title: "Min side",
 };
 
-// Prototype: viser en fast demo-bruker til innlogging er på plass.
-const DEMO_SELLER_ID = "s1";
+export const dynamic = "force-dynamic";
 
-export default function ProfilePage() {
-  const seller = SELLERS.find((s) => s.id === DEMO_SELLER_ID)!;
-  const all = searchListings({ includeSold: true }).filter(
-    (l) => l.sellerId === seller.id
-  );
+// Prototype: viser en fast demo-bruker til innlogging er på plass.
+export default async function ProfilePage() {
+  const seller = await getDemoSeller();
+  const all = await searchListings({
+    includeSold: true,
+    sellerId: seller.id,
+  });
   const active = all.filter((l) => !l.sold);
   const sold = all.filter((l) => l.sold);
   const earned = sold.reduce((sum, l) => sum + l.price, 0);

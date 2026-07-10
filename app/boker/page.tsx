@@ -20,7 +20,7 @@ export default async function BooksPage({
   const { q, kategori } = await searchParams;
   const category =
     kategori && kategori in CATEGORY_LABELS ? (kategori as Category) : undefined;
-  const listings = searchListings({ query: q, category });
+  const listings = await searchListings({ query: q, category });
 
   return (
     <div>

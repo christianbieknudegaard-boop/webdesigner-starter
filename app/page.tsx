@@ -21,8 +21,10 @@ const STEPS = [
   },
 ];
 
-export default function Home() {
-  const latest = searchListings().slice(0, 8);
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  const latest = (await searchListings()).slice(0, 8);
 
   return (
     <div className="space-y-14">

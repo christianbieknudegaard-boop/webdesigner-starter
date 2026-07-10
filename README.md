@@ -25,14 +25,19 @@ nettleseren («Legg til på hjemskjerm»).
 - 🔌 REST-API (`/api/listings`) som mobilappen bruker
 - 📱 Mobilapp med Hjem (søk/liste), Selg og Min side
 
-> Dette er en prototype med demodata i `lib/data.ts`. Neste steg er ekte
-> database, innlogging (Vipps/e-post), betaling og bildeopplasting – se
+> Annonser lagres i en ekte database (Prisma). Lokalt brukes SQLite uten
+> noe oppsett; ved lansering bytter du til Postgres (f.eks. Neon eller
+> Supabase) ved å endre `provider` i `prisma/schema.prisma` og
+> `DATABASE_URL`. Innlogging, betaling og bildeopplasting står i
 > veikartet nederst.
 
 ## Kom i gang – nettsiden
 
 ```bash
 npm install
+cp .env.example .env   # DATABASE_URL (SQLite lokalt)
+npm run db:push        # oppretter databasen
+npm run db:seed        # legger inn demodata
 npm run dev
 ```
 
@@ -57,21 +62,27 @@ app/            Sider og API-ruter (Next.js App Router)
   bok/[id]/     Annonsedetaljer
   selg/         Selg en bok
   profil/       Min side
-  api/listings/ REST-API (brukes av web og mobil)
+  api/listings/ REST-API for annonser (brukes av web og mobil)
+  api/bokdata/  ISBN-/tekstoppslag i bokkatalogen
 components/     Delte UI-komponenter
-lib/data.ts     Demodata og søkelogikk
+lib/db.ts       Prisma-klient (databasen)
+lib/data.ts     Spørringer og validering
+lib/catalog.ts  Bokkatalog for autoutfylling
+prisma/         Datamodell og seed-skript
 types/          Delte TypeScript-typer
 mobile/         Expo-appen
 ```
 
 ## Veikart
 
-1. **Database** – bytt ut `lib/data.ts` med Postgres (f.eks. Supabase/Neon)
-2. **Innlogging** – Vipps Login og e-post
-3. **Betaling** – Vipps/Stripe med pengene i forvaring til levert bok
-4. **Frakt** – ferdig frankert etikett via Posten/Helthjem-API
-5. **Bilder** – opplasting av ekte bokbilder (erstatter fargeomslagene)
-6. **Bokkatalog** – utvid `lib/catalog.ts` til en ekte bokdatabase
+1. **Innlogging** – Vipps Login og e-post (nye annonser eies i dag av en
+   demo-bruker)
+2. **Betaling** – Vipps/Stripe med pengene i forvaring til levert bok
+3. **Frakt** – ferdig frankert etikett via Posten/Helthjem-API
+4. **Bilder** – opplasting av ekte bokbilder (erstatter fargeomslagene)
+5. **Bokkatalog** – utvid `lib/catalog.ts` til en ekte bokdatabase
    (f.eks. Bokbasen) i stedet for demodata + Google Books
-7. **Meldinger** – chat mellom kjøper og selger
-8. **App-butikkene** – bygg og publiser Expo-appen via EAS
+6. **Meldinger** – chat mellom kjøper og selger
+7. **App-butikkene** – bygg og publiser Expo-appen via EAS
+8. **Produksjonsdatabase** – bytt SQLite til Postgres (Neon/Supabase) ved
+   deploy: endre `provider` i `prisma/schema.prisma` og sett `DATABASE_URL`

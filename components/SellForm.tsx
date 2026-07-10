@@ -52,7 +52,8 @@ const inputCls =
 export default function SellForm() {
   const [form, setForm] = useState<FormState>(EMPTY);
   const [originalPrice, setOriginalPrice] = useState<number | null>(null);
-  const [submitted, setSubmitted] = useState(false);
+  const [createdId, setCreatedId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Boksøk (steg 1)
@@ -173,7 +174,7 @@ export default function SellForm() {
         ] as const)
       : null;
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.title || !form.author || !form.category || !form.condition) {
       setError("Fyll inn tittel, forfatter, kategori og tilstand.");
@@ -185,31 +186,63 @@ export default function SellForm() {
       return;
     }
     setError(null);
-    // Prototype: annonsen lagres ikke ennå. Neste steg er POST /api/listings
-    // med innlogget bruker og bildeopplasting.
-    setSubmitted(true);
+    setSaving(true);
+    try {
+      const res = await fetch("/api/listings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: form.title,
+          author: form.author,
+          isbn: form.isbn,
+          category: form.category,
+          condition: form.condition,
+          price: Math.round(price),
+          originalPrice: originalPrice ?? undefined,
+          description: form.description,
+        }),
+      });
+      const data = (await res.json()) as {
+        listing?: { id: string };
+        error?: string;
+      };
+      if (!res.ok || !data.listing) {
+        setError(data.error ?? "Noe gikk galt. Prøv igjen.");
+        return;
+      }
+      setCreatedId(data.listing.id);
+    } catch {
+      setError("Fikk ikke kontakt med serveren. Prøv igjen.");
+    } finally {
+      setSaving(false);
+    }
   }
 
-  if (submitted) {
+  if (createdId) {
     return (
       <div className="mt-8 rounded-2xl border border-border bg-surface p-8 text-center">
         <p className="text-4xl">🎉</p>
         <h2 className="mt-3 text-xl font-bold text-brand-dark">
-          Annonsen din er klar!
+          Annonsen er lagt ut!
         </h2>
         <p className="mt-2 text-muted">
-          «{form.title}» av {form.author} legges ut for {form.price} kr. I
-          denne prototypen lagres ikke annonsen ennå – innlogging og lagring
-          kommer i neste versjon.
+          «{form.title}» av {form.author} er nå til salgs for {form.price} kr
+          og synlig i søket.
         </p>
-        <div className="mt-6 flex justify-center gap-3">
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <Link
+            href={`/bok/${createdId}`}
+            className="rounded-full bg-accent px-5 py-2.5 font-semibold text-white transition hover:opacity-90"
+          >
+            Se annonsen
+          </Link>
           <button
             onClick={() => {
               setForm(EMPTY);
               setOriginalPrice(null);
               setBookChosen(false);
               setLookupMessage(null);
-              setSubmitted(false);
+              setCreatedId(null);
             }}
             className="rounded-full bg-brand px-5 py-2.5 font-semibold text-white transition hover:bg-brand-dark"
           >
@@ -444,9 +477,10 @@ export default function SellForm() {
 
       <button
         type="submit"
-        className="w-full rounded-full bg-accent py-3 font-semibold text-white transition hover:opacity-90 sm:w-auto sm:px-10"
+        disabled={saving}
+        className="w-full rounded-full bg-accent py-3 font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:px-10"
       >
-        Legg ut annonsen
+        {saving ? "Legger ut …" : "Legg ut annonsen"}
       </button>
     </form>
   );

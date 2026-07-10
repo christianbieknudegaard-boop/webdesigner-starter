@@ -16,6 +16,16 @@ export const CONDITION_LABELS: Record<BookCondition, string> = {
   slitt: "Slitt",
 };
 
+export const CATEGORY_LABELS: Record<string, string> = {
+  skjonnlitteratur: "Skjønnlitteratur",
+  krim: "Krim og spenning",
+  fantasy: "Fantasy og sci-fi",
+  "barn-og-ungdom": "Barn og ungdom",
+  pensum: "Pensum og studiebøker",
+  fakta: "Fakta og dokumentar",
+  biografi: "Biografier",
+};
+
 export interface Seller {
   id: string;
   name: string;
@@ -67,6 +77,30 @@ export async function lookupIsbn(isbn: string): Promise<CatalogBook | null> {
   if (!res.ok) return null;
   const data = (await res.json()) as { book: CatalogBook | null };
   return data.book;
+}
+
+export interface NewListing {
+  title: string;
+  author: string;
+  isbn?: string;
+  category: string;
+  condition: BookCondition;
+  price: number;
+  description?: string;
+}
+
+/** Oppretter en annonse. Kaster ved valideringsfeil fra serveren. */
+export async function createListing(input: NewListing): Promise<Listing> {
+  const res = await fetch(new URL("/api/listings", BASE_URL).toString(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const data = (await res.json()) as { listing?: Listing; error?: string };
+  if (!res.ok || !data.listing) {
+    throw new Error(data.error ?? `API-feil: ${res.status}`);
+  }
+  return data.listing;
 }
 
 /** Tekstsøk i bokkatalogen (tittel, forfatter eller ISBN). */

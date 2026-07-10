@@ -7,7 +7,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const listing = getListing(id);
+  const listing = await getListing(id);
   if (!listing) {
     return NextResponse.json({ error: "Fant ikke annonsen" }, { status: 404 });
   }
