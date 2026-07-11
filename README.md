@@ -66,6 +66,16 @@ npm run dev
 Demodataene inkluderer fire kontoer du kan logge inn med, f.eks.
 `ingrid@example.com` med passordet `bokfink123`.
 
+## Tester
+
+```bash
+npm test
+```
+
+Integrasjonstester for forretningslogikken (annonser, kjøp, meldinger,
+rapportering, kontosletting) som kjører rett mot databasen. Testene
+lager egne testbrukere og rydder opp etter seg.
+
 ## Kom i gang – mobilappen
 
 ```bash
@@ -98,8 +108,7 @@ mobile/         Expo-appen
 
 ## Veikart
 
-1. **Vipps Login** – i tillegg til e-post/passord (krever Vipps-avtale);
-   mobilappen bør også lagre sesjonen med expo-secure-store
+1. **Vipps Login** – i tillegg til e-post/passord (krever Vipps-avtale)
 2. **Betaling** – koble Vipps/Stripe på kjøpsflyten, med pengene i
    forvaring til levert bok
 3. **Frakt** – ferdig frankert etikett via Posten/Helthjem-API

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -15,7 +16,7 @@ import { useAuth } from "../AuthContext";
 import { colors } from "../theme";
 
 export default function ProfileScreen() {
-  const { user, setUser } = useAuth();
+  const { user, setUser, restoring } = useAuth();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [name, setName] = useState("");
   const [city, setCity] = useState("");
@@ -45,6 +46,14 @@ export default function ProfileScreen() {
   async function handleLogout() {
     await logout();
     setUser(null);
+  }
+
+  if (restoring) {
+    return (
+      <View style={[styles.container, { justifyContent: "center" }]}>
+        <ActivityIndicator color={colors.brand} />
+      </View>
+    );
   }
 
   if (user) {

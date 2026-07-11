@@ -7,16 +7,45 @@
 export const BASE_URL =
   process.env.EXPO_PUBLIC_API_URL ?? "http://192.168.1.1:3000";
 
-// Sesjonstoken holdes i minnet. Neste steg: expo-secure-store slik at
-// innloggingen overlever at appen startes på nytt.
+// Sesjonstoken holdes i minnet og speiles til sikker lagring på enheten
+// (Keychain/Keystore), så innloggingen overlever at appen startes på nytt.
+import * as SecureStore from "expo-secure-store";
+
+const TOKEN_KEY = "bokfink_session_token";
 let authToken: string | null = null;
 
 export function setAuthToken(token: string | null) {
   authToken = token;
+  // Fire-and-forget: lagringen trenger ikke blokkere API-kall.
+  if (token) {
+    void SecureStore.setItemAsync(TOKEN_KEY, token);
+  } else {
+    void SecureStore.deleteItemAsync(TOKEN_KEY);
+  }
+}
+
+/** Leser lagret token ved appstart (uten å skrive det tilbake). */
+export async function loadStoredToken(): Promise<string | null> {
+  try {
+    authToken = await SecureStore.getItemAsync(TOKEN_KEY);
+  } catch {
+    authToken = null;
+  }
+  return authToken;
 }
 
 export function getAuthToken() {
   return authToken;
+}
+
+/** Innlogget bruker for gjeldende token, eller null. */
+export async function fetchMe(): Promise<Profile | null> {
+  const res = await fetch(new URL("/api/auth/me", BASE_URL).toString(), {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error(`API-feil: ${res.status}`);
+  const data = (await res.json()) as { seller: Profile | null };
+  return data.seller;
 }
 
 function authHeaders(): Record<string, string> {
