@@ -273,6 +273,74 @@ export async function buyListing(
   }
 }
 
+export type OrderStatus = "kjopt" | "sendt" | "levert";
+
+export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
+  kjopt: "Kjøpt – venter på sending",
+  sendt: "Sendt",
+  levert: "Levert",
+};
+
+export interface Order {
+  id: string;
+  listingId: string;
+  status: OrderStatus;
+  itemPrice: number;
+  shippingPrice: number;
+  rating: number | null;
+  createdAt: string;
+  shipName: string;
+  shipStreet: string;
+  shipPostalCode: string;
+  shipCity: string;
+  listing: { title: string; author: string; seller?: { name: string } };
+  buyer?: { name: string };
+}
+
+/** Mine kjøp og salg (krever innlogging). */
+export async function fetchOrders(): Promise<{
+  purchases: Order[];
+  sales: Order[];
+}> {
+  const res = await fetch(new URL("/api/orders", BASE_URL).toString(), {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error(`API-feil: ${res.status}`);
+  return (await res.json()) as { purchases: Order[]; sales: Order[] };
+}
+
+/** Selger merker "sendt"; kjøper bekrefter "levert". */
+export async function setOrderStatus(orderId: string, status: OrderStatus) {
+  const res = await fetch(
+    new URL(`/api/orders/${orderId}`, BASE_URL).toString(),
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ status }),
+    }
+  );
+  if (!res.ok) {
+    const data = (await res.json()) as { error?: string };
+    throw new Error(data.error ?? `API-feil: ${res.status}`);
+  }
+}
+
+/** Kjøperens vurdering av selgeren (1–5) etter levering. */
+export async function rateOrder(orderId: string, rating: number) {
+  const res = await fetch(
+    new URL(`/api/orders/${orderId}/vurdering`, BASE_URL).toString(),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ rating }),
+    }
+  );
+  if (!res.ok) {
+    const data = (await res.json()) as { error?: string };
+    throw new Error(data.error ?? `API-feil: ${res.status}`);
+  }
+}
+
 export interface ConversationSummary {
   id: string;
   listingId: string;

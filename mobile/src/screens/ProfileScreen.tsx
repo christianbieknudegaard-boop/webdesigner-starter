@@ -1,18 +1,20 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
-import { login, logout, register } from "../api";
+import { Order, fetchOrders, login, logout, register } from "../api";
 import { useAuth } from "../AuthContext";
+import OrderCard from "../OrderCards";
 import { colors } from "../theme";
 
 export default function ProfileScreen() {
@@ -23,6 +25,28 @@ export default function ProfileScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+
+  // Kjøp og salg
+  const [purchases, setPurchases] = useState<Order[]>([]);
+  const [sales, setSales] = useState<Order[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadOrders = useCallback(async () => {
+    if (!user) return;
+    try {
+      const data = await fetchOrders();
+      setPurchases(data.purchases);
+      setSales(data.sales);
+    } catch {
+      // Beholder forrige liste ved nettverksglipp.
+    } finally {
+      setRefreshing(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    void loadOrders();
+  }, [loadOrders]);
 
   async function submit() {
     setBusy(true);
@@ -60,7 +84,16 @@ export default function ProfileScreen() {
     return (
       <ScrollView
         style={styles.container}
-        contentContainerStyle={{ padding: 16 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              void loadOrders();
+            }}
+          />
+        }
       >
         <View style={styles.avatarRow}>
           <View style={styles.avatar}>
@@ -87,6 +120,43 @@ export default function ProfileScreen() {
             <Text style={styles.statValue}>{user.salesCount}</Text>
           </View>
         </View>
+
+        {purchases.length > 0 && (
+          <>
+            <Text style={styles.sectionTitle}>
+              Mine kjøp ({purchases.length})
+            </Text>
+            {purchases.map((o) => (
+              <OrderCard
+                key={o.id}
+                order={o}
+                role="buyer"
+                onChanged={loadOrders}
+              />
+            ))}
+          </>
+        )}
+
+        {sales.length > 0 && (
+          <>
+            <Text style={styles.sectionTitle}>Mine salg ({sales.length})</Text>
+            {sales.map((o) => (
+              <OrderCard
+                key={o.id}
+                order={o}
+                role="seller"
+                onChanged={loadOrders}
+              />
+            ))}
+          </>
+        )}
+
+        {purchases.length === 0 && sales.length === 0 && (
+          <Text style={[styles.meta, { marginTop: 20 }]}>
+            Ingen kjøp eller salg ennå. Når du handler, følger du ordrene
+            dine her.
+          </Text>
+        )}
 
         <Pressable style={styles.logout} onPress={handleLogout}>
           <Text style={styles.logoutText}>Logg ut</Text>
@@ -214,6 +284,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "800",
     marginTop: 4,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: colors.brandDark,
+    marginTop: 24,
+    marginBottom: 10,
   },
   label: {
     fontWeight: "600",
