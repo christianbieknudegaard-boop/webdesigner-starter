@@ -5,7 +5,12 @@ import {
   CATEGORY_LABELS,
   CONDITION_LABELS,
   Category,
+  FILM_FORMAT_LABELS,
+  FilmFormat,
   ListingWithSeller,
+  PRODUCT_TYPE_LABELS,
+  ProductType,
+  categoryBelongsTo,
 } from "@/types/marketplace";
 
 type ListingRow = Prisma.ListingGetPayload<{ include: { seller: true } }>;
@@ -13,11 +18,13 @@ type ListingRow = Prisma.ListingGetPayload<{ include: { seller: true } }>;
 function toListing(row: ListingRow): ListingWithSeller {
   return {
     id: row.id,
+    productType: row.productType as ProductType,
     title: row.title,
     author: row.author,
     isbn: row.isbn,
     category: row.category as Category,
     condition: row.condition as BookCondition,
+    format: row.format ? (row.format as FilmFormat) : undefined,
     price: row.price,
     originalPrice: row.originalPrice ?? undefined,
     description: row.description,
@@ -50,6 +57,7 @@ export async function getListing(
 export interface ListingFilter {
   query?: string;
   category?: Category;
+  productType?: ProductType;
   includeSold?: boolean;
   sellerId?: string;
 }
@@ -61,6 +69,7 @@ export async function searchListings(
     where: {
       ...(filter.includeSold ? {} : { sold: false }),
       ...(filter.category ? { category: filter.category } : {}),
+      ...(filter.productType ? { productType: filter.productType } : {}),
       ...(filter.sellerId ? { sellerId: filter.sellerId } : {}),
     },
     include: { seller: true },
@@ -94,11 +103,13 @@ const COVER_COLORS = [
 ];
 
 export interface NewListingInput {
+  productType?: string;
   title: string;
   author: string;
   isbn?: string;
   category: string;
   condition: string;
+  format?: string;
   price: number;
   originalPrice?: number;
   description?: string;
@@ -108,10 +119,19 @@ export interface NewListingInput {
 export function validateNewListing(
   input: Partial<NewListingInput>
 ): string | null {
+  const productType = input.productType ?? "bok";
+  if (!(productType in PRODUCT_TYPE_LABELS)) return "Ugyldig produkttype";
   if (!input.title?.trim()) return "Tittel mangler";
-  if (!input.author?.trim()) return "Forfatter mangler";
+  if (!input.author?.trim())
+    return productType === "film" ? "Regissør mangler" : "Forfatter mangler";
   if (!input.category || !(input.category in CATEGORY_LABELS))
     return "Ugyldig kategori";
+  if (!categoryBelongsTo(productType as ProductType, input.category))
+    return "Kategorien passer ikke produkttypen";
+  if (productType === "film") {
+    if (!input.format || !(input.format in FILM_FORMAT_LABELS))
+      return "Velg format (DVD, Blu-ray eller 4K)";
+  }
   if (!input.condition || !(input.condition in CONDITION_LABELS))
     return "Ugyldig tilstand";
   if (
@@ -218,8 +238,11 @@ export async function createListing(
   for (const ch of input.title) hash = (hash * 31 + ch.charCodeAt(0)) | 0;
   const coverColor = COVER_COLORS[Math.abs(hash) % COVER_COLORS.length];
 
+  const productType = input.productType ?? "bok";
   const row = await prisma.listing.create({
     data: {
+      productType,
+      format: productType === "film" ? (input.format ?? "") : "",
       title: input.title.trim(),
       author: input.author.trim(),
       isbn: input.isbn?.trim() ?? "",

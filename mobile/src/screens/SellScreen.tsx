@@ -16,9 +16,12 @@ import * as ImagePicker from "expo-image-picker";
 import { Image } from "react-native";
 import {
   BookCondition,
-  CATEGORY_LABELS,
+  CATEGORIES_BY_TYPE,
   CONDITION_LABELS,
   CatalogBook,
+  FILM_FORMAT_LABELS,
+  FilmFormat,
+  ProductType,
   createListing,
   lookupIsbn,
   searchCatalog,
@@ -29,12 +32,14 @@ import { colors } from "../theme";
 
 export default function SellScreen() {
   const { user } = useAuth();
+  const [productType, setProductType] = useState<ProductType>("bok");
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
   const [isbn, setIsbn] = useState("");
   const [price, setPrice] = useState("");
   const [condition, setCondition] = useState<BookCondition | null>(null);
   const [category, setCategory] = useState<string | null>(null);
+  const [format, setFormat] = useState<FilmFormat | null>(null);
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -64,10 +69,12 @@ export default function SellScreen() {
   }, [search]);
 
   function applyBook(book: CatalogBook) {
+    setProductType(book.productType ?? "bok");
     setTitle(book.title);
     setAuthor(book.author);
     setIsbn(book.isbn);
     if (book.category) setCategory(book.category);
+    if ((book.productType ?? "bok") === "bok") setFormat(null);
     setSuggestions([]);
     setSearch("");
     setLookupMessage(`Fant «${book.title}» – detaljene er fylt inn.`);
@@ -118,19 +125,27 @@ export default function SellScreen() {
     if (!title || !author || !price || !condition || !category) {
       Alert.alert(
         "Mangler noe",
-        "Fyll inn tittel, forfatter, pris, kategori og tilstand."
+        productType === "film"
+          ? "Fyll inn tittel, regissør, pris, kategori og tilstand."
+          : "Fyll inn tittel, forfatter, pris, kategori og tilstand."
       );
+      return;
+    }
+    if (productType === "film" && !format) {
+      Alert.alert("Mangler format", "Velg DVD, Blu-ray eller 4K.");
       return;
     }
     setSaving(true);
     try {
       const imageUrl = imageUri ? await uploadImage(imageUri) : undefined;
       await createListing({
+        productType,
         title,
         author,
         isbn: isbn || undefined,
         category,
         condition,
+        format: productType === "film" ? (format ?? undefined) : undefined,
         price: Math.round(Number(price)),
         imageUrl,
       });
@@ -144,6 +159,7 @@ export default function SellScreen() {
       setPrice("");
       setCondition(null);
       setCategory(null);
+      setFormat(null);
       setImageUri(null);
       setLookupMessage(null);
     } catch (e) {
@@ -206,14 +222,43 @@ export default function SellScreen() {
         contentContainerStyle={{ padding: 16 }}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.heading}>Selg en bok</Text>
+        <Text style={styles.heading}>
+          {productType === "film" ? "Selg en film" : "Selg en bok"}
+        </Text>
         <Text style={styles.sub}>
-          Gratis å legge ut – vi tar først et lite gebyr når boken er solgt.
+          Gratis å legge ut – vi tar først et lite gebyr ved salg.
         </Text>
 
-        {/* Steg 1: Finn boken */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>1. Finn boken</Text>
+        <View style={styles.chips}>
+          {(["bok", "film"] as ProductType[]).map((t) => (
+            <Pressable
+              key={t}
+              onPress={() => {
+                setProductType(t);
+                setCategory((c) =>
+                  c && c in CATEGORIES_BY_TYPE[t] ? c : null
+                );
+                if (t === "bok") setFormat(null);
+              }}
+              style={[styles.chip, productType === t && styles.chipActive]}
+            >
+              <Text
+                style={[
+                  styles.chipText,
+                  productType === t && styles.chipTextActive,
+                ]}
+              >
+                {t === "film" ? "🎬 Film" : "📚 Bok"}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        {/* Steg 1: Finn produktet */}
+        <View style={[styles.card, { marginTop: 14 }]}>
+          <Text style={styles.cardTitle}>
+            1. Finn {productType === "film" ? "filmen" : "boken"}
+          </Text>
           <View style={styles.searchRow}>
             <TextInput
               style={[styles.input, { flex: 1 }]}
@@ -254,16 +299,24 @@ export default function SellScreen() {
           placeholderTextColor={colors.muted}
         />
 
-        <Text style={styles.label}>Forfatter</Text>
+        <Text style={styles.label}>
+          {productType === "film" ? "Regissør" : "Forfatter"}
+        </Text>
         <TextInput
           style={styles.input}
           value={author}
           onChangeText={setAuthor}
-          placeholder="Forfatterens navn"
+          placeholder={
+            productType === "film" ? "Regissørens navn" : "Forfatterens navn"
+          }
           placeholderTextColor={colors.muted}
         />
 
-        <Text style={styles.label}>ISBN (valgfritt)</Text>
+        <Text style={styles.label}>
+          {productType === "film"
+            ? "Strekkode / EAN (valgfritt)"
+            : "ISBN (valgfritt)"}
+        </Text>
         <TextInput
           style={styles.input}
           value={isbn}
@@ -285,23 +338,49 @@ export default function SellScreen() {
 
         <Text style={styles.label}>Kategori</Text>
         <View style={styles.chips}>
-          {Object.keys(CATEGORY_LABELS).map((cat) => (
-            <Pressable
-              key={cat}
-              onPress={() => setCategory(cat)}
-              style={[styles.chip, category === cat && styles.chipActive]}
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  category === cat && styles.chipTextActive,
-                ]}
+          {Object.entries(CATEGORIES_BY_TYPE[productType]).map(
+            ([cat, label]) => (
+              <Pressable
+                key={cat}
+                onPress={() => setCategory(cat)}
+                style={[styles.chip, category === cat && styles.chipActive]}
               >
-                {CATEGORY_LABELS[cat]}
-              </Text>
-            </Pressable>
-          ))}
+                <Text
+                  style={[
+                    styles.chipText,
+                    category === cat && styles.chipTextActive,
+                  ]}
+                >
+                  {label}
+                </Text>
+              </Pressable>
+            )
+          )}
         </View>
+
+        {productType === "film" && (
+          <>
+            <Text style={styles.label}>Format</Text>
+            <View style={styles.chips}>
+              {(Object.keys(FILM_FORMAT_LABELS) as FilmFormat[]).map((f) => (
+                <Pressable
+                  key={f}
+                  onPress={() => setFormat(f)}
+                  style={[styles.chip, format === f && styles.chipActive]}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      format === f && styles.chipTextActive,
+                    ]}
+                  >
+                    {FILM_FORMAT_LABELS[f]}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </>
+        )}
 
         <Text style={styles.label}>Tilstand</Text>
         <View style={styles.chips}>
@@ -323,7 +402,9 @@ export default function SellScreen() {
           ))}
         </View>
 
-        <Text style={styles.label}>Bilde av boken (valgfritt)</Text>
+        <Text style={styles.label}>
+          Bilde av {productType === "film" ? "filmen" : "boken"} (valgfritt)
+        </Text>
         <View style={styles.imageRow}>
           <Pressable style={styles.imageButton} onPress={() => pickImage(true)}>
             <Text style={styles.imageButtonText}>📷 Ta bilde</Text>

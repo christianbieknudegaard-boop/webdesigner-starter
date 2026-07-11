@@ -107,6 +107,32 @@ test("validering: annonse og adresse", () => {
   );
 });
 
+test("validering: film krever format og filmkategori", () => {
+  const FILM = {
+    productType: "film",
+    title: "Testfilmen",
+    author: "Test Regissør",
+    category: "film-drama",
+    condition: "god",
+    price: 50,
+  };
+  // Film uten format avvises
+  assert.equal(
+    validateNewListing({ ...FILM }),
+    "Velg format (DVD, Blu-ray eller 4K)"
+  );
+  assert.equal(validateNewListing({ ...FILM, format: "dvd" }), null);
+  // Bokkategori på film avvises, og omvendt
+  assert.equal(
+    validateNewListing({ ...FILM, format: "dvd", category: "krim" }),
+    "Kategorien passer ikke produkttypen"
+  );
+  assert.equal(
+    validateNewListing({ ...BOOK, category: "film-drama" }),
+    "Kategorien passer ikke produkttypen"
+  );
+});
+
 test("annonser: opprett, søk, rediger og tilgangskontroll", async () => {
   const seller = await makeSeller("Selger En");
   const other = await makeSeller("Annen Bruker");

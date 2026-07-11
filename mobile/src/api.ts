@@ -61,7 +61,17 @@ export const CONDITION_LABELS: Record<BookCondition, string> = {
   slitt: "Slitt",
 };
 
-export const CATEGORY_LABELS: Record<string, string> = {
+export type ProductType = "bok" | "film";
+
+export type FilmFormat = "dvd" | "blu-ray" | "4k";
+
+export const FILM_FORMAT_LABELS: Record<FilmFormat, string> = {
+  dvd: "DVD",
+  "blu-ray": "Blu-ray",
+  "4k": "4K Ultra HD",
+};
+
+export const BOOK_CATEGORIES: Record<string, string> = {
   skjonnlitteratur: "Skjønnlitteratur",
   krim: "Krim og spenning",
   fantasy: "Fantasy og sci-fi",
@@ -69,6 +79,27 @@ export const CATEGORY_LABELS: Record<string, string> = {
   pensum: "Pensum og studiebøker",
   fakta: "Fakta og dokumentar",
   biografi: "Biografier",
+};
+
+export const FILM_CATEGORIES: Record<string, string> = {
+  "film-drama": "Drama",
+  "film-komedie": "Komedie",
+  "film-action": "Action og eventyr",
+  "film-skrekk": "Skrekk og thriller",
+  "film-barn": "Barnefilm",
+  "film-serier": "TV-serier",
+  "film-dokumentar": "Dokumentar",
+};
+
+export const CATEGORIES_BY_TYPE: Record<ProductType, Record<string, string>> =
+  {
+    bok: BOOK_CATEGORIES,
+    film: FILM_CATEGORIES,
+  };
+
+export const CATEGORY_LABELS: Record<string, string> = {
+  ...BOOK_CATEGORIES,
+  ...FILM_CATEGORIES,
 };
 
 export interface Seller {
@@ -82,11 +113,14 @@ export interface Seller {
 
 export interface Listing {
   id: string;
+  productType: ProductType;
   title: string;
+  /** Forfatter for bøker, regissør for film. */
   author: string;
   isbn: string;
   category: string;
   condition: BookCondition;
+  format?: FilmFormat;
   price: number;
   originalPrice?: number;
   description: string;
@@ -97,9 +131,13 @@ export interface Listing {
   seller: Seller;
 }
 
-export async function fetchListings(query?: string): Promise<Listing[]> {
+export async function fetchListings(
+  query?: string,
+  type?: ProductType
+): Promise<Listing[]> {
   const url = new URL("/api/listings", BASE_URL);
   if (query) url.searchParams.set("q", query);
+  if (type) url.searchParams.set("type", type);
   const res = await fetch(url.toString());
   if (!res.ok) throw new Error(`API-feil: ${res.status}`);
   const data = (await res.json()) as { listings: Listing[] };
@@ -111,6 +149,7 @@ export interface CatalogBook {
   isbn: string;
   title: string;
   author: string;
+  productType?: ProductType;
   category?: string;
   originalPrice?: number;
 }
@@ -126,11 +165,13 @@ export async function lookupIsbn(isbn: string): Promise<CatalogBook | null> {
 }
 
 export interface NewListing {
+  productType?: ProductType;
   title: string;
   author: string;
   isbn?: string;
   category: string;
   condition: BookCondition;
+  format?: FilmFormat;
   price: number;
   description?: string;
   imageUrl?: string;

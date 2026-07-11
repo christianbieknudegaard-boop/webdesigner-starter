@@ -16,7 +16,9 @@ import {
 import {
   BASE_URL,
   CONDITION_LABELS,
+  FILM_FORMAT_LABELS,
   Listing,
+  ProductType,
   buyListing,
   fetchListings,
   startChat,
@@ -52,7 +54,12 @@ function ListingRow({
         <Text style={styles.title} numberOfLines={2}>
           {listing.title}
         </Text>
-        <Text style={styles.author}>{listing.author}</Text>
+        <Text style={styles.author}>
+          {listing.author}
+          {listing.productType === "film" && listing.format
+            ? ` · ${FILM_FORMAT_LABELS[listing.format]}`
+            : ""}
+        </Text>
         <View style={styles.cardFooter}>
           <Text style={styles.price}>{listing.price} kr</Text>
           <Text style={styles.condition}>
@@ -299,40 +306,68 @@ function ListingDetail({
 
 export default function HomeScreen() {
   const [query, setQuery] = useState("");
+  const [type, setType] = useState<ProductType | undefined>(undefined);
   const [listings, setListings] = useState<Listing[]>([]);
   const [selected, setSelected] = useState<Listing | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async (q: string) => {
-    try {
-      setError(null);
-      setListings(await fetchListings(q || undefined));
-    } catch {
-      setError(
-        "Fikk ikke kontakt med serveren. Sjekk at nettsiden kjører og at EXPO_PUBLIC_API_URL peker på riktig adresse."
-      );
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+  const load = useCallback(
+    async (q: string, t: ProductType | undefined) => {
+      try {
+        setError(null);
+        setListings(await fetchListings(q || undefined, t));
+      } catch {
+        setError(
+          "Fikk ikke kontakt med serveren. Sjekk at nettsiden kjører og at EXPO_PUBLIC_API_URL peker på riktig adresse."
+        );
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
-    const timer = setTimeout(() => load(query), 300);
+    const timer = setTimeout(() => load(query, type), 300);
     return () => clearTimeout(timer);
-  }, [query, load]);
+  }, [query, type, load]);
+
+  const TYPE_CHIPS: { value: ProductType | undefined; label: string }[] = [
+    { value: undefined, label: "Alt" },
+    { value: "bok", label: "📚 Bøker" },
+    { value: "film", label: "🎬 Film" },
+  ];
 
   return (
     <View style={styles.container}>
       <TextInput
         style={styles.search}
-        placeholder="Søk på tittel, forfatter eller ISBN …"
+        placeholder="Søk på tittel eller strekkode …"
         placeholderTextColor={colors.muted}
         value={query}
         onChangeText={setQuery}
       />
+      <View style={styles.typeRow}>
+        {TYPE_CHIPS.map((chip) => (
+          <Pressable
+            key={chip.label}
+            onPress={() => setType(chip.value)}
+            style={[styles.typeChip, type === chip.value && styles.typeChipActive]}
+          >
+            <Text
+              style={[
+                styles.typeChipText,
+                type === chip.value && styles.typeChipTextActive,
+              ]}
+            >
+              {chip.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
       {loading ? (
         <ActivityIndicator style={{ marginTop: 40 }} color={colors.brand} />
       ) : error ? (
@@ -350,7 +385,7 @@ export default function HomeScreen() {
               refreshing={refreshing}
               onRefresh={() => {
                 setRefreshing(true);
-                load(query);
+                load(query, type);
               }}
             />
           }
@@ -365,7 +400,7 @@ export default function HomeScreen() {
           onClose={() => setSelected(null)}
           onBought={() => {
             setSelected(null);
-            load(query);
+            load(query, type);
           }}
         />
       )}
@@ -382,9 +417,21 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     paddingHorizontal: 18,
     paddingVertical: 10,
-    marginBottom: 12,
+    marginBottom: 8,
     color: colors.foreground,
   },
+  typeRow: { flexDirection: "row", gap: 8, marginBottom: 12 },
+  typeChip: {
+    borderColor: colors.border,
+    borderWidth: 1,
+    backgroundColor: colors.surface,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  typeChipActive: { backgroundColor: colors.brand, borderColor: colors.brand },
+  typeChipText: { color: colors.foreground, fontSize: 13, fontWeight: "600" },
+  typeChipTextActive: { color: "#fff" },
   card: {
     flexDirection: "row",
     backgroundColor: colors.surface,

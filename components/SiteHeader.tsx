@@ -27,11 +27,14 @@ export default async function SiteHeader() {
         </Link>
 
         <nav className="hidden items-center gap-6 text-sm font-medium text-muted sm:flex">
-          <Link href="/boker" className="hover:text-brand-dark">
-            Finn bøker
+          <Link href="/boker?type=bok" className="hover:text-brand-dark">
+            Bøker
+          </Link>
+          <Link href="/boker?type=film" className="hover:text-brand-dark">
+            Film
           </Link>
           <Link href="/selg" className="hover:text-brand-dark">
-            Selg bøker
+            Selg
           </Link>
           {seller ? (
             <>
@@ -60,8 +63,9 @@ export default async function SiteHeader() {
 
       {/* Simple mobile nav */}
       <nav className="flex items-center justify-around border-t border-border py-2 text-sm font-medium text-muted sm:hidden">
-        <Link href="/boker">Finn bøker</Link>
-        <Link href="/selg">Selg bøker</Link>
+        <Link href="/boker?type=bok">Bøker</Link>
+        <Link href="/boker?type=film">Film</Link>
+        <Link href="/selg">Selg</Link>
         {seller ? (
           <>
             <Link href="/meldinger">

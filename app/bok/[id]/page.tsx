@@ -9,7 +9,11 @@ import ReportListingButton from "@/components/ReportListingButton";
 import { getCurrentSeller } from "@/lib/auth";
 import { getListing, searchListings } from "@/lib/data";
 import { SHIPPING_PRICE } from "@/lib/orders";
-import { CATEGORY_LABELS, CONDITION_LABELS } from "@/types/marketplace";
+import {
+  CATEGORY_LABELS,
+  CONDITION_LABELS,
+  FILM_FORMAT_LABELS,
+} from "@/types/marketplace";
 
 export default async function ListingPage({
   params,
@@ -35,8 +39,11 @@ export default async function ListingPage({
   return (
     <div>
       <nav className="text-sm text-muted">
-        <Link href="/boker" className="hover:text-brand-dark">
-          Finn bøker
+        <Link
+          href={`/boker?type=${listing.productType}`}
+          className="hover:text-brand-dark"
+        >
+          {listing.productType === "film" ? "Finn filmer" : "Finn bøker"}
         </Link>{" "}
         / {CATEGORY_LABELS[listing.category]}
       </nav>
@@ -58,12 +65,18 @@ export default async function ListingPage({
             <span className="rounded-full bg-brand-light px-3 py-1 font-medium text-brand-dark">
               {CONDITION_LABELS[listing.condition]}
             </span>
+            {listing.productType === "film" && listing.format && (
+              <span className="rounded-full bg-accent/10 px-3 py-1 font-medium text-accent">
+                {FILM_FORMAT_LABELS[listing.format]}
+              </span>
+            )}
             <span className="rounded-full border border-border bg-surface px-3 py-1">
               {CATEGORY_LABELS[listing.category]}
             </span>
             {listing.isbn && (
               <span className="rounded-full border border-border bg-surface px-3 py-1">
-                ISBN {listing.isbn}
+                {listing.productType === "film" ? "EAN" : "ISBN"}{" "}
+                {listing.isbn}
               </span>
             )}
           </div>

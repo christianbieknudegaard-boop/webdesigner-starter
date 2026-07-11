@@ -39,6 +39,10 @@ model Session {
 
 model Listing {
   id            String   @id @default(cuid())
+  // "bok" eller "film"; author = regissør og isbn = EAN for film
+  productType   String   @default("bok")
+  // Kun for film: "dvd", "blu-ray" eller "4k"
+  format        String   @default("")
   title         String
   author        String
   isbn          String   @default("")

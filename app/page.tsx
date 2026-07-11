@@ -1,7 +1,7 @@
 import Link from "next/link";
 import ListingCard from "@/components/ListingCard";
 import { searchListings } from "@/lib/data";
-import { CATEGORY_LABELS, Category } from "@/types/marketplace";
+import { BOOK_CATEGORIES, FILM_CATEGORIES } from "@/types/marketplace";
 
 const STEPS = [
   {
@@ -32,11 +32,12 @@ export default async function Home() {
       <section className="rounded-3xl bg-brand px-6 py-12 text-white sm:px-12">
         <div className="max-w-2xl">
           <h1 className="text-3xl font-bold leading-tight sm:text-5xl">
-            Gi bøkene dine et nytt liv
+            Gi bøkene og filmene dine et nytt liv
           </h1>
           <p className="mt-4 text-lg text-white/85">
-            Kjøp og selg brukte bøker enkelt og trygt. Spar penger på pensum,
-            finn din neste favorittroman – og rydd i bokhylla samtidig.
+            Kjøp og selg brukte bøker og filmer enkelt og trygt. Spar penger
+            på pensum, finn din neste favorittroman eller filmkveldens
+            klassiker – og rydd i hylla samtidig.
           </p>
           <form action="/boker" className="mt-8 flex max-w-xl gap-2">
             <input
@@ -63,14 +64,32 @@ export default async function Home() {
       {/* Categories */}
       <section>
         <h2 className="text-2xl font-bold text-brand-dark">Utforsk kategorier</h2>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {(Object.keys(CATEGORY_LABELS) as Category[]).map((cat) => (
+        <p className="mt-3 text-sm font-semibold text-muted">📚 Bøker</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {Object.entries(BOOK_CATEGORIES).map(([cat, label]) => (
             <Link
               key={cat}
               href={`/boker?kategori=${cat}`}
               className="rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground transition hover:border-brand hover:text-brand-dark"
             >
-              {CATEGORY_LABELS[cat]}
+              {label}
+            </Link>
+          ))}
+        </div>
+        <p className="mt-4 text-sm font-semibold text-muted">
+          🎬 Film og serier{" "}
+          <span className="ml-1 rounded-full bg-accent px-2 py-0.5 text-xs font-bold text-white">
+            Nytt!
+          </span>
+        </p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {Object.entries(FILM_CATEGORIES).map(([cat, label]) => (
+            <Link
+              key={cat}
+              href={`/boker?kategori=${cat}`}
+              className="rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground transition hover:border-brand hover:text-brand-dark"
+            >
+              {label}
             </Link>
           ))}
         </div>

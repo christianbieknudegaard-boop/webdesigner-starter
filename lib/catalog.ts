@@ -1,15 +1,17 @@
-import { Category } from "@/types/marketplace";
+import { Category, ProductType } from "@/types/marketplace";
 
 /**
- * Bokkatalogen: metadata om kjente bøker, slått opp via ISBN (strekkode)
- * eller tekstsøk når noen skal selge en bok. I produksjon erstattes denne
- * av en ekte bokdatabase; ukjente ISBN slås i mellomtiden opp mot Google
- * Books i API-ruten.
+ * Katalogen: metadata om kjente bøker og filmer, slått opp via strekkode
+ * (ISBN/EAN) eller tekstsøk når noen skal selge. I produksjon erstattes
+ * denne av en ekte produktdatabase; ukjente ISBN slås i mellomtiden opp
+ * mot Google Books i API-ruten (kun bøker).
  */
 export interface CatalogBook {
   isbn: string;
   title: string;
+  /** Forfatter for bøker, regissør for film. */
   author: string;
+  productType?: ProductType; // udefinert = bok
   category?: Category;
   /** Veiledende nypris i kroner, brukes til prisforslag. */
   originalPrice?: number;
@@ -113,6 +115,39 @@ export const CATALOG: CatalogBook[] = [
     author: "James Clear",
     category: "fakta",
     originalPrice: 249,
+  },
+  // Film (EAN-strekkoder)
+  {
+    isbn: "7020560910136",
+    title: "Flåklypa Grand Prix",
+    author: "Ivo Caprino",
+    productType: "film",
+    category: "film-barn",
+    originalPrice: 199,
+  },
+  {
+    isbn: "7340112717322",
+    title: "Ringenes herre-trilogien (Extended Edition)",
+    author: "Peter Jackson",
+    productType: "film",
+    category: "film-action",
+    originalPrice: 399,
+  },
+  {
+    isbn: "7020560920128",
+    title: "Kon-Tiki",
+    author: "Joachim Rønning og Espen Sandberg",
+    productType: "film",
+    category: "film-drama",
+    originalPrice: 149,
+  },
+  {
+    isbn: "5051895034125",
+    title: "Game of Thrones – sesong 1",
+    author: "HBO",
+    productType: "film",
+    category: "film-serier",
+    originalPrice: 299,
   },
 ];
 

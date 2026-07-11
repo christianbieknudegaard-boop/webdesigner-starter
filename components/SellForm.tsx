@@ -6,27 +6,36 @@ import BarcodeScannerModal from "@/components/BarcodeScannerModal";
 import { CatalogBook, normalizeIsbn } from "@/lib/catalog";
 import {
   BookCondition,
-  CATEGORY_LABELS,
+  CATEGORIES_BY_TYPE,
   CONDITION_LABELS,
   Category,
+  FILM_FORMAT_LABELS,
+  FilmFormat,
+  PRODUCT_TYPE_LABELS,
+  ProductType,
+  categoryBelongsTo,
 } from "@/types/marketplace";
 
 interface FormState {
+  productType: ProductType;
   isbn: string;
   title: string;
   author: string;
   category: Category | "";
   condition: BookCondition | "";
+  format: FilmFormat | "";
   price: string;
   description: string;
 }
 
 const EMPTY: FormState = {
+  productType: "bok",
   isbn: "",
   title: "",
   author: "",
   category: "",
   condition: "",
+  format: "",
   price: "",
   description: "",
 };
@@ -111,10 +120,12 @@ export default function SellForm() {
   function applyBook(book: CatalogBook, source: string) {
     setForm((f) => ({
       ...f,
+      productType: book.productType ?? "bok",
       isbn: book.isbn,
       title: book.title,
       author: book.author,
       category: book.category ?? f.category,
+      format: book.productType === "film" ? f.format : "",
     }));
     setOriginalPrice(book.originalPrice ?? null);
     setBookChosen(true);
@@ -179,7 +190,15 @@ export default function SellForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.title || !form.author || !form.category || !form.condition) {
-      setError("Fyll inn tittel, forfatter, kategori og tilstand.");
+      setError(
+        form.productType === "film"
+          ? "Fyll inn tittel, regissør, kategori og tilstand."
+          : "Fyll inn tittel, forfatter, kategori og tilstand."
+      );
+      return;
+    }
+    if (form.productType === "film" && !form.format) {
+      setError("Velg format (DVD, Blu-ray eller 4K).");
       return;
     }
     const price = Number(form.price);
@@ -214,6 +233,8 @@ export default function SellForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           imageUrl,
+          productType: form.productType,
+          format: form.format || undefined,
           title: form.title,
           author: form.author,
           isbn: form.isbn,
@@ -292,19 +313,48 @@ export default function SellForm() {
         />
       )}
 
-      {/* Steg 1: Finn boken */}
+      {/* Produkttype */}
+      <div className="flex gap-2">
+        {(Object.keys(PRODUCT_TYPE_LABELS) as ProductType[]).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() =>
+              setForm((f) => ({
+                ...f,
+                productType: t,
+                // Nullstill felter som ikke gir mening på tvers av typer
+                category: categoryBelongsTo(t, f.category) ? f.category : "",
+                format: t === "film" ? f.format : "",
+              }))
+            }
+            className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
+              form.productType === t
+                ? "bg-brand text-white"
+                : "border border-border bg-surface text-foreground hover:border-brand"
+            }`}
+          >
+            {t === "film" ? "🎬 Film" : "📚 Bok"}
+          </button>
+        ))}
+      </div>
+
+      {/* Steg 1: Finn produktet */}
       <div className="rounded-2xl border border-border bg-surface p-5">
-        <h2 className="font-semibold text-brand-dark">1. Finn boken</h2>
+        <h2 className="font-semibold text-brand-dark">
+          1. Finn {form.productType === "film" ? "filmen" : "boken"}
+        </h2>
         <p className="mt-1 text-sm text-muted">
-          Skann strekkoden på baksiden av boken, eller søk på tittel,
-          forfatter eller ISBN – så fyller vi inn detaljene for deg.
+          Skann strekkoden på baksiden, eller søk på tittel,{" "}
+          {form.productType === "film" ? "regissør" : "forfatter"} eller
+          strekkode – så fyller vi inn detaljene for deg.
         </p>
 
         <div className="mt-3 flex gap-2">
           <div ref={searchBoxRef} className="relative w-full">
             <input
               className={inputCls}
-              placeholder="Søk på tittel, forfatter eller ISBN …"
+              placeholder="Søk på tittel eller strekkode …"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => {
@@ -323,9 +373,12 @@ export default function SellForm() {
                       onClick={() => applyBook(book, "katalog")}
                       className="w-full px-4 py-2.5 text-left transition hover:bg-brand-light"
                     >
-                      <span className="block font-medium">{book.title}</span>
+                      <span className="block font-medium">
+                        {book.productType === "film" ? "🎬 " : ""}
+                        {book.title}
+                      </span>
                       <span className="block text-sm text-muted">
-                        {book.author} · ISBN {book.isbn}
+                        {book.author} · {book.isbn}
                       </span>
                     </button>
                   </li>
@@ -352,14 +405,17 @@ export default function SellForm() {
         )}
         {!bookChosen && !lookupBusy && !lookupMessage && (
           <p className="mt-3 text-xs text-muted">
-            Fant du ikke boken? Fyll inn detaljene manuelt under.
+            Fant du ikke {form.productType === "film" ? "filmen" : "boken"}?
+            Fyll inn detaljene manuelt under.
           </p>
         )}
       </div>
 
       {/* Steg 2: Detaljer */}
       <div className="rounded-2xl border border-border bg-surface p-5">
-        <h2 className="font-semibold text-brand-dark">2. Om boken</h2>
+        <h2 className="font-semibold text-brand-dark">
+          2. Om {form.productType === "film" ? "filmen" : "boken"}
+        </h2>
 
         <div className="mt-3 grid gap-5 sm:grid-cols-2">
           <div>
@@ -369,19 +425,25 @@ export default function SellForm() {
             <input
               id="title"
               className={inputCls}
-              placeholder="Boktittel"
+              placeholder={
+                form.productType === "film" ? "Filmtittel" : "Boktittel"
+              }
               value={form.title}
               onChange={(e) => update("title", e.target.value)}
             />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium" htmlFor="author">
-              Forfatter *
+              {form.productType === "film" ? "Regissør *" : "Forfatter *"}
             </label>
             <input
               id="author"
               className={inputCls}
-              placeholder="Forfatterens navn"
+              placeholder={
+                form.productType === "film"
+                  ? "Regissørens navn"
+                  : "Forfatterens navn"
+              }
               value={form.author}
               onChange={(e) => update("author", e.target.value)}
             />
@@ -391,7 +453,9 @@ export default function SellForm() {
         <div className="mt-5 grid gap-5 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium" htmlFor="isbn">
-              ISBN (valgfritt)
+              {form.productType === "film"
+                ? "Strekkode / EAN (valgfritt)"
+                : "ISBN (valgfritt)"}
             </label>
             <input
               id="isbn"
@@ -416,14 +480,39 @@ export default function SellForm() {
               onChange={(e) => update("category", e.target.value as Category)}
             >
               <option value="">Velg kategori</option>
-              {(Object.keys(CATEGORY_LABELS) as Category[]).map((cat) => (
-                <option key={cat} value={cat}>
-                  {CATEGORY_LABELS[cat]}
+              {Object.entries(CATEGORIES_BY_TYPE[form.productType]).map(
+                ([cat, label]) => (
+                  <option key={cat} value={cat}>
+                    {label}
+                  </option>
+                )
+              )}
+            </select>
+          </div>
+        </div>
+
+        {form.productType === "film" && (
+          <div className="mt-5">
+            <label className="mb-1 block text-sm font-medium" htmlFor="format">
+              Format *
+            </label>
+            <select
+              id="format"
+              className={inputCls}
+              value={form.format}
+              onChange={(e) =>
+                update("format", e.target.value as FilmFormat)
+              }
+            >
+              <option value="">Velg format</option>
+              {(Object.keys(FILM_FORMAT_LABELS) as FilmFormat[]).map((f) => (
+                <option key={f} value={f}>
+                  {FILM_FORMAT_LABELS[f]}
                 </option>
               ))}
             </select>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Steg 3: Tilstand og pris */}
@@ -482,7 +571,8 @@ export default function SellForm() {
       {/* Steg 4: Bilde */}
       <div className="rounded-2xl border border-border bg-surface p-5">
         <h2 className="font-semibold text-brand-dark">
-          4. Bilde av boken (valgfritt)
+          4. Bilde av {form.productType === "film" ? "filmen" : "boken"}{" "}
+          (valgfritt)
         </h2>
         <p className="mt-1 text-sm text-muted">
           Annonser med ekte bilde selger raskere. Ta bilde av forsiden i godt

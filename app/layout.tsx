@@ -16,11 +16,11 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Bokfink – kjøp og selg brukte bøker",
+    default: "Bokfink – kjøp og selg brukte bøker og filmer",
     template: "%s | Bokfink",
   },
   description:
-    "Bokfink er markedsplassen for brukte bøker. Finn billige pensumbøker, romaner og barnebøker – eller selg bøkene du er ferdig med.",
+    "Bokfink er markedsplassen for brukte bøker og filmer. Finn billige pensumbøker, romaner og filmer på DVD/Blu-ray – eller selg det du er ferdig med.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,

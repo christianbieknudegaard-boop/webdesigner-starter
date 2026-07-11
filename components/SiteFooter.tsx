@@ -10,8 +10,8 @@ export default function SiteFooter() {
             <Logo size={28} /> Bokfink
           </p>
           <p className="mt-2 text-sm text-muted">
-            Norges hyggeligste markedsplass for brukte bøker. Kjøp og selg
-            trygt, spar penger og gi bøkene et nytt liv.
+            Norges hyggeligste markedsplass for brukte bøker og filmer. Kjøp
+            og selg trygt, spar penger og gi tingene et nytt liv.
           </p>
         </div>
         <div className="text-sm">

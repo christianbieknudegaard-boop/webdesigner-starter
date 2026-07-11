@@ -6,10 +6,15 @@ import {
   searchListings,
   validateNewListing,
 } from "@/lib/data";
-import { CATEGORY_LABELS, Category } from "@/types/marketplace";
+import {
+  CATEGORY_LABELS,
+  Category,
+  PRODUCT_TYPE_LABELS,
+  ProductType,
+} from "@/types/marketplace";
 
 /**
- * GET /api/listings?q=<søk>&kategori=<kategori>
+ * GET /api/listings?q=<søk>&kategori=<kategori>&type=<bok|film>
  * Brukes av både nettsiden og mobilappen.
  */
 export async function GET(request: NextRequest) {
@@ -20,8 +25,13 @@ export async function GET(request: NextRequest) {
     rawCategory && rawCategory in CATEGORY_LABELS
       ? (rawCategory as Category)
       : undefined;
+  const rawType = params.get("type");
+  const productType =
+    rawType && rawType in PRODUCT_TYPE_LABELS
+      ? (rawType as ProductType)
+      : undefined;
 
-  const listings = await searchListings({ query: q, category });
+  const listings = await searchListings({ query: q, category, productType });
   return NextResponse.json({ listings });
 }
 

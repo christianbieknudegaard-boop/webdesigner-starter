@@ -1,15 +1,35 @@
 import Link from "next/link";
 import ListingCard from "@/components/ListingCard";
 import { searchListings } from "@/lib/data";
-import { CATEGORY_LABELS, Category } from "@/types/marketplace";
+import {
+  CATEGORIES_BY_TYPE,
+  CATEGORY_LABELS,
+  Category,
+  PRODUCT_TYPE_LABELS,
+  ProductType,
+} from "@/types/marketplace";
 
 export const metadata = {
-  title: "Finn bøker",
+  title: "Finn bøker og filmer",
 };
 
 interface SearchParams {
   q?: string;
   kategori?: string;
+  type?: string;
+}
+
+function buildUrl(params: {
+  q?: string;
+  kategori?: string;
+  type?: string;
+}): string {
+  const search = new URLSearchParams();
+  if (params.q) search.set("q", params.q);
+  if (params.kategori) search.set("kategori", params.kategori);
+  if (params.type) search.set("type", params.type);
+  const qs = search.toString();
+  return qs ? `/boker?${qs}` : "/boker";
 }
 
 export default async function BooksPage({
@@ -17,24 +37,41 @@ export default async function BooksPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const { q, kategori } = await searchParams;
+  const { q, kategori, type } = await searchParams;
+  const productType =
+    type && type in PRODUCT_TYPE_LABELS ? (type as ProductType) : undefined;
   const category =
     kategori && kategori in CATEGORY_LABELS ? (kategori as Category) : undefined;
-  const listings = await searchListings({ query: q, category });
+  const listings = await searchListings({ query: q, category, productType });
+
+  // Kategorichips: for valgt type, ellers alle
+  const categories = productType
+    ? CATEGORIES_BY_TYPE[productType]
+    : CATEGORY_LABELS;
+
+  const chipCls = (active: boolean) =>
+    `rounded-full px-4 py-1.5 text-sm font-medium transition ${
+      active
+        ? "bg-brand text-white"
+        : "border border-border bg-surface text-foreground hover:border-brand"
+    }`;
 
   return (
     <div>
-      <h1 className="text-3xl font-bold text-brand-dark">Finn bøker</h1>
+      <h1 className="text-3xl font-bold text-brand-dark">
+        Finn bøker og filmer
+      </h1>
 
       <form action="/boker" className="mt-6 flex max-w-xl gap-2">
         <input
           type="search"
           name="q"
           defaultValue={q ?? ""}
-          placeholder="Søk på tittel, forfatter eller ISBN …"
+          placeholder="Søk på tittel, forfatter/regissør eller strekkode …"
           className="w-full rounded-full border border-border bg-surface px-5 py-3 outline-none placeholder:text-muted focus:border-brand"
         />
         {category && <input type="hidden" name="kategori" value={category} />}
+        {productType && <input type="hidden" name="type" value={productType} />}
         <button
           type="submit"
           className="shrink-0 rounded-full bg-brand px-6 py-3 font-semibold text-white transition hover:bg-brand-dark"
@@ -43,36 +80,47 @@ export default async function BooksPage({
         </button>
       </form>
 
+      {/* Produkttype */}
       <div className="mt-4 flex flex-wrap gap-2">
+        <Link href={buildUrl({ q })} className={chipCls(!productType)}>
+          Alt
+        </Link>
+        {(Object.keys(PRODUCT_TYPE_LABELS) as ProductType[]).map((t) => (
+          <Link
+            key={t}
+            href={buildUrl({ q, type: t })}
+            className={chipCls(productType === t)}
+          >
+            {t === "film" ? "🎬 " : "📚 "}
+            {PRODUCT_TYPE_LABELS[t]}
+          </Link>
+        ))}
+      </div>
+
+      {/* Kategorier */}
+      <div className="mt-2 flex flex-wrap gap-2">
         <Link
-          href={q ? `/boker?q=${encodeURIComponent(q)}` : "/boker"}
-          className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
-            !category
-              ? "bg-brand text-white"
-              : "border border-border bg-surface text-foreground hover:border-brand"
-          }`}
+          href={buildUrl({ q, type: productType })}
+          className={chipCls(!category)}
         >
           Alle
         </Link>
-        {(Object.keys(CATEGORY_LABELS) as Category[]).map((cat) => (
+        {Object.keys(categories).map((cat) => (
           <Link
             key={cat}
-            href={`/boker?kategori=${cat}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
-            className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
-              category === cat
-                ? "bg-brand text-white"
-                : "border border-border bg-surface text-foreground hover:border-brand"
-            }`}
+            href={buildUrl({ q, kategori: cat, type: productType })}
+            className={chipCls(category === cat)}
           >
-            {CATEGORY_LABELS[cat]}
+            {categories[cat]}
           </Link>
         ))}
       </div>
 
       <p className="mt-6 text-sm text-muted">
-        {listings.length} {listings.length === 1 ? "bok" : "bøker"} til salgs
+        {listings.length} {listings.length === 1 ? "annonse" : "annonser"}
         {q ? ` for «${q}»` : ""}
         {category ? ` i ${CATEGORY_LABELS[category]}` : ""}
+        {productType ? ` (${PRODUCT_TYPE_LABELS[productType].toLowerCase()})` : ""}
       </p>
 
       {listings.length === 0 ? (
