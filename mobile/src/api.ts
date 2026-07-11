@@ -61,14 +61,35 @@ export const CONDITION_LABELS: Record<BookCondition, string> = {
   slitt: "Slitt",
 };
 
-export type ProductType = "bok" | "film";
+export type ProductType = "bok" | "film" | "musikk";
 
-export type FilmFormat = "dvd" | "blu-ray" | "4k";
+export const PRODUCT_TYPE_EMOJI: Record<ProductType, string> = {
+  bok: "📚",
+  film: "🎬",
+  musikk: "🎵",
+};
 
-export const FILM_FORMAT_LABELS: Record<FilmFormat, string> = {
+/** Etikett for opphavsfeltet per produkttype. */
+export const AUTHOR_LABELS: Record<ProductType, string> = {
+  bok: "Forfatter",
+  film: "Regissør",
+  musikk: "Artist",
+};
+
+export type ItemFormat = "dvd" | "blu-ray" | "4k" | "lp" | "cd";
+
+export const FORMAT_LABELS: Record<ItemFormat, string> = {
   dvd: "DVD",
   "blu-ray": "Blu-ray",
   "4k": "4K Ultra HD",
+  lp: "LP (vinyl)",
+  cd: "CD",
+};
+
+export const FORMATS_BY_TYPE: Record<ProductType, ItemFormat[]> = {
+  bok: [],
+  film: ["dvd", "blu-ray", "4k"],
+  musikk: ["lp", "cd"],
 };
 
 export const BOOK_CATEGORIES: Record<string, string> = {
@@ -91,15 +112,27 @@ export const FILM_CATEGORIES: Record<string, string> = {
   "film-dokumentar": "Dokumentar",
 };
 
+export const MUSIC_CATEGORIES: Record<string, string> = {
+  "musikk-rock": "Rock",
+  "musikk-pop": "Pop",
+  "musikk-jazz-blues": "Jazz og blues",
+  "musikk-klassisk": "Klassisk",
+  "musikk-hiphop": "Hiphop og R&B",
+  "musikk-elektronisk": "Elektronisk",
+  "musikk-norsk": "Norsk musikk",
+};
+
 export const CATEGORIES_BY_TYPE: Record<ProductType, Record<string, string>> =
   {
     bok: BOOK_CATEGORIES,
     film: FILM_CATEGORIES,
+    musikk: MUSIC_CATEGORIES,
   };
 
 export const CATEGORY_LABELS: Record<string, string> = {
   ...BOOK_CATEGORIES,
   ...FILM_CATEGORIES,
+  ...MUSIC_CATEGORIES,
 };
 
 export interface Seller {
@@ -120,7 +153,7 @@ export interface Listing {
   isbn: string;
   category: string;
   condition: BookCondition;
-  format?: FilmFormat;
+  format?: ItemFormat;
   price: number;
   originalPrice?: number;
   description: string;
@@ -171,7 +204,7 @@ export interface NewListing {
   isbn?: string;
   category: string;
   condition: BookCondition;
-  format?: FilmFormat;
+  format?: ItemFormat;
   price: number;
   description?: string;
   imageUrl?: string;

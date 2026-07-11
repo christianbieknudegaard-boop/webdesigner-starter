@@ -75,7 +75,13 @@ gang («Legg til på hjemskjerm») – PWA-manifestet er allerede på plass.
 - [ ] Legg ut en bok **med bilde** – bildet skal vises i oversikten
       (verifiserer at Vercel Blob er riktig koblet)
 - [ ] Kjøp en bok med en annen konto, merk som sendt/mottatt
+- [ ] Skann strekkoden på en DVD og en LP-plate i selg-flyten –
+      verifiserer de eksterne oppslagene (MusicBrainz/UPCitemdb),
+      som ikke kunne testes fra utviklingsmiljøet
 - [ ] Åpne siden på mobil og «Legg til på hjemskjerm»
+
+Valgfritt: sett `TMDB_API_KEY` (gratis fra themoviedb.org) som
+miljøvariabel for tittelforslag på filmer i selg-flyten.
 
 ## Kjente begrensninger før ekte lansering
 

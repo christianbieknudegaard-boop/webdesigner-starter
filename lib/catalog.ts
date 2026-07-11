@@ -149,6 +149,31 @@ export const CATALOG: CatalogBook[] = [
     category: "film-serier",
     originalPrice: 299,
   },
+  // Musikk (EAN-strekkoder)
+  {
+    isbn: "0602557048414",
+    title: "a-ha – Hunting High and Low",
+    author: "a-ha",
+    productType: "musikk",
+    category: "musikk-norsk",
+    originalPrice: 349,
+  },
+  {
+    isbn: "5099902988313",
+    title: "Pink Floyd – The Dark Side of the Moon",
+    author: "Pink Floyd",
+    productType: "musikk",
+    category: "musikk-rock",
+    originalPrice: 399,
+  },
+  {
+    isbn: "0602547156686",
+    title: "Highasakite – Silent Treatment",
+    author: "Highasakite",
+    productType: "musikk",
+    category: "musikk-norsk",
+    originalPrice: 299,
+  },
 ];
 
 /** Fjerner bindestreker og mellomrom fra et ISBN. */

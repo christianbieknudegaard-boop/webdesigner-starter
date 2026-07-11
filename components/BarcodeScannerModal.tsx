@@ -65,8 +65,9 @@ export default function BarcodeScannerModal({ onDetected, onClose }: Props) {
           if (!videoRef.current || videoRef.current.readyState < 2) return;
           try {
             const codes = await detector.detect(videoRef.current);
+            // EAN-13 (bøker, filmer, plater) eller EAN-8
             const isbn = codes.find((c) =>
-              /^97[89]\d{10}$/.test(c.rawValue)
+              /^(\d{13}|\d{8})$/.test(c.rawValue)
             )?.rawValue;
             if (isbn) {
               if (timer) clearInterval(timer);

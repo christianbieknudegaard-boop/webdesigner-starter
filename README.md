@@ -1,8 +1,8 @@
 # 📖 Bokfink
 
-Markedsplass for brukte bøker **og filmer** – en konkurrent til Bookis.
-Kjøp og selg pensumbøker, romaner, barnebøker og filmer på
-DVD/Blu-ray/4K trygt og enkelt.
+Markedsplass for brukte bøker, filmer **og musikk** – en konkurrent til
+Bookis. Kjøp og selg pensumbøker, romaner, filmer på DVD/Blu-ray/4K og
+plater på LP/CD trygt og enkelt.
 
 Prosjektet består av to deler:
 
@@ -16,10 +16,13 @@ nettleseren («Legg til på hjemskjerm»).
 
 ## Funksjoner i denne versjonen (MVP)
 
-- 🎬 To produkttyper: bøker og film (DVD/Blu-ray/4K) med egne
-  kategorier – samme strekkodeskanning og kjøpsflyt for begge
-- 🔍 Søk på tittel, forfatter/regissør og strekkode (ISBN/EAN), med
-  type- og kategorifilter
+- 🎬🎵 Tre produkttyper: bøker, film (DVD/Blu-ray/4K) og musikk (LP/CD)
+  med egne kategorier – samme strekkodeskanning og kjøpsflyt for alle
+- 🔍 Søk på tittel, forfatter/regissør/artist og strekkode (ISBN/EAN),
+  med type- og kategorifilter
+- 🌐 Eksterne strekkode-oppslag: Google Books (bøker), MusicBrainz
+  (musikk) og UPCitemdb (annet) – pluss valgfri TMDb-tittelsøk for
+  film med `TMDB_API_KEY`
 - 📚 Bla i annonser med tilstand, pris og «du sparer»-prosent
 - 📄 Annonsedetaljer med selgerinfo, vurdering og relaterte bøker
 - 🏷️ «Selg en bok»-flyt med prisveiledning per tilstand

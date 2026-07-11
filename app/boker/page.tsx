@@ -5,12 +5,13 @@ import {
   CATEGORIES_BY_TYPE,
   CATEGORY_LABELS,
   Category,
+  PRODUCT_TYPE_EMOJI,
   PRODUCT_TYPE_LABELS,
   ProductType,
 } from "@/types/marketplace";
 
 export const metadata = {
-  title: "Finn bøker og filmer",
+  title: "Finn bøker, filmer og musikk",
 };
 
 interface SearchParams {
@@ -59,7 +60,7 @@ export default async function BooksPage({
   return (
     <div>
       <h1 className="text-3xl font-bold text-brand-dark">
-        Finn bøker og filmer
+        Finn bøker, filmer og musikk
       </h1>
 
       <form action="/boker" className="mt-6 flex max-w-xl gap-2">
@@ -67,7 +68,7 @@ export default async function BooksPage({
           type="search"
           name="q"
           defaultValue={q ?? ""}
-          placeholder="Søk på tittel, forfatter/regissør eller strekkode …"
+          placeholder="Søk på tittel, opphav eller strekkode …"
           className="w-full rounded-full border border-border bg-surface px-5 py-3 outline-none placeholder:text-muted focus:border-brand"
         />
         {category && <input type="hidden" name="kategori" value={category} />}
@@ -91,8 +92,7 @@ export default async function BooksPage({
             href={buildUrl({ q, type: t })}
             className={chipCls(productType === t)}
           >
-            {t === "film" ? "🎬 " : "📚 "}
-            {PRODUCT_TYPE_LABELS[t]}
+            {PRODUCT_TYPE_EMOJI[t]} {PRODUCT_TYPE_LABELS[t]}
           </Link>
         ))}
       </div>

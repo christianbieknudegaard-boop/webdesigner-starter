@@ -5,63 +5,78 @@ import {
   normalizeIsbn,
   searchCatalog,
 } from "@/lib/catalog";
+import {
+  lookupGoogleBooks,
+  lookupMusicBrainz,
+  lookupUpcItemDb,
+  searchTmdb,
+} from "@/lib/lookup";
 
 /**
- * Bokoppslag for selg-flyten (web og mobil):
- *   GET /api/bokdata?isbn=9788203373114  → { book: CatalogBook | null }
- *   GET /api/bokdata?q=nesbø             → { books: CatalogBook[] }
+ * Vareoppslag for selg-flyten (web og mobil):
+ *   GET /api/bokdata?isbn=<strekkode>      → { book: CatalogBook | null }
+ *   GET /api/bokdata?q=<søk>&type=<type>   → { books: CatalogBook[] }
  *
- * Ukjente ISBN slås opp mot Google Books som reserveløsning.
+ * Strekkoder utenfor katalogen slås opp eksternt:
+ * ISBN (978/979) → Google Books; andre EAN → MusicBrainz (musikk),
+ * deretter UPCitemdb (generelt). Tittelsøk for film utvides med TMDb
+ * når TMDB_API_KEY er satt.
  */
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const isbn = params.get("isbn");
   const q = params.get("q");
+  const type = params.get("type");
 
   if (isbn) {
     const clean = normalizeIsbn(isbn);
-    if (clean.length !== 10 && clean.length !== 13) {
+    if (clean.length < 8 || clean.length > 14) {
       return NextResponse.json(
-        { error: "Ugyldig ISBN – må være 10 eller 13 siffer" },
+        { error: "Ugyldig strekkode" },
         { status: 400 }
       );
     }
-    const local = findByIsbn(clean);
-    if (local) return NextResponse.json({ book: local, source: "katalog" });
 
-    const external = await lookupGoogleBooks(clean);
-    return NextResponse.json({ book: external, source: "google-books" });
+    const local = findByIsbn(clean);
+    if (local) {
+      return NextResponse.json({
+        book: { ...local, productType: local.productType ?? "bok" },
+        source: "katalog",
+      });
+    }
+
+    let external: CatalogBook | null = null;
+    let source = "";
+    if (/^97[89]\d{10}$/.test(clean)) {
+      external = await lookupGoogleBooks(clean);
+      source = "google-books";
+    } else {
+      external = await lookupMusicBrainz(clean);
+      source = "musicbrainz";
+      if (!external) {
+        external = await lookupUpcItemDb(clean);
+        source = "upcitemdb";
+      }
+    }
+    return NextResponse.json({ book: external, source });
   }
 
   if (q) {
-    return NextResponse.json({ books: searchCatalog(q) });
+    const books = searchCatalog(q);
+    // Utvid filmsøk med TMDb når nøkkelen er satt (fyller på til 6 treff)
+    if (type === "film" && books.length < 6) {
+      const tmdb = await searchTmdb(q);
+      const seen = new Set(books.map((b) => b.title.toLowerCase()));
+      for (const hit of tmdb) {
+        if (books.length >= 6) break;
+        if (!seen.has(hit.title.toLowerCase())) books.push(hit);
+      }
+    }
+    return NextResponse.json({ books });
   }
 
   return NextResponse.json(
     { error: "Oppgi ?isbn= eller ?q=" },
     { status: 400 }
   );
-}
-
-async function lookupGoogleBooks(isbn: string): Promise<CatalogBook | null> {
-  try {
-    const res = await fetch(
-      `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`,
-      { signal: AbortSignal.timeout(4000), next: { revalidate: 86400 } }
-    );
-    if (!res.ok) return null;
-    const data = (await res.json()) as {
-      items?: { volumeInfo?: { title?: string; authors?: string[] } }[];
-    };
-    const info = data.items?.[0]?.volumeInfo;
-    if (!info?.title) return null;
-    return {
-      isbn,
-      title: info.title,
-      author: info.authors?.join(" og ") ?? "Ukjent forfatter",
-    };
-  } catch {
-    // Nettverksfeil eller timeout – selgeren fyller inn manuelt i stedet.
-    return null;
-  }
 }

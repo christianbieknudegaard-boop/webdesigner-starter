@@ -2,7 +2,7 @@ import Link from "next/link";
 import BookCover from "@/components/BookCover";
 import {
   CONDITION_LABELS,
-  FILM_FORMAT_LABELS,
+  FORMAT_LABELS,
   ListingWithSeller,
 } from "@/types/marketplace";
 
@@ -25,9 +25,7 @@ export default function ListingCard({ listing }: { listing: ListingWithSeller })
         </p>
         <p className="text-sm text-muted">
           {listing.author}
-          {listing.productType === "film" && listing.format
-            ? ` · ${FILM_FORMAT_LABELS[listing.format]}`
-            : ""}
+          {listing.format ? ` · ${FORMAT_LABELS[listing.format]}` : ""}
         </p>
         <div className="mt-auto flex items-end justify-between pt-3">
           <div>

@@ -119,7 +119,7 @@ test("validering: film krever format og filmkategori", () => {
   // Film uten format avvises
   assert.equal(
     validateNewListing({ ...FILM }),
-    "Velg format (DVD, Blu-ray eller 4K)"
+    "Velg format (DVD, Blu-ray, 4K Ultra HD)"
   );
   assert.equal(validateNewListing({ ...FILM, format: "dvd" }), null);
   // Bokkategori på film avvises, og omvendt
@@ -131,6 +131,28 @@ test("validering: film krever format og filmkategori", () => {
     validateNewListing({ ...BOOK, category: "film-drama" }),
     "Kategorien passer ikke produkttypen"
   );
+});
+
+test("validering: musikk krever LP/CD-format", () => {
+  const PLATE = {
+    productType: "musikk",
+    title: "Testplaten",
+    author: "Test Artist",
+    category: "musikk-rock",
+    condition: "god",
+    price: 150,
+  };
+  assert.equal(
+    validateNewListing({ ...PLATE }),
+    "Velg format (LP (vinyl), CD)"
+  );
+  // Filmformat på musikk avvises
+  assert.equal(
+    validateNewListing({ ...PLATE, format: "dvd" }),
+    "Velg format (LP (vinyl), CD)"
+  );
+  assert.equal(validateNewListing({ ...PLATE, format: "lp" }), null);
+  assert.equal(validateNewListing({ ...PLATE, format: "cd" }), null);
 });
 
 test("annonser: opprett, søk, rediger og tilgangskontroll", async () => {

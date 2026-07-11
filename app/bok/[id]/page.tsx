@@ -12,7 +12,7 @@ import { SHIPPING_PRICE } from "@/lib/orders";
 import {
   CATEGORY_LABELS,
   CONDITION_LABELS,
-  FILM_FORMAT_LABELS,
+  FORMAT_LABELS,
 } from "@/types/marketplace";
 
 export default async function ListingPage({
@@ -43,7 +43,11 @@ export default async function ListingPage({
           href={`/boker?type=${listing.productType}`}
           className="hover:text-brand-dark"
         >
-          {listing.productType === "film" ? "Finn filmer" : "Finn bøker"}
+          {listing.productType === "film"
+            ? "Finn filmer"
+            : listing.productType === "musikk"
+              ? "Finn musikk"
+              : "Finn bøker"}
         </Link>{" "}
         / {CATEGORY_LABELS[listing.category]}
       </nav>
@@ -65,9 +69,9 @@ export default async function ListingPage({
             <span className="rounded-full bg-brand-light px-3 py-1 font-medium text-brand-dark">
               {CONDITION_LABELS[listing.condition]}
             </span>
-            {listing.productType === "film" && listing.format && (
+            {listing.format && (
               <span className="rounded-full bg-accent/10 px-3 py-1 font-medium text-accent">
-                {FILM_FORMAT_LABELS[listing.format]}
+                {FORMAT_LABELS[listing.format]}
               </span>
             )}
             <span className="rounded-full border border-border bg-surface px-3 py-1">
@@ -75,7 +79,7 @@ export default async function ListingPage({
             </span>
             {listing.isbn && (
               <span className="rounded-full border border-border bg-surface px-3 py-1">
-                {listing.productType === "film" ? "EAN" : "ISBN"}{" "}
+                {listing.productType === "bok" ? "ISBN" : "EAN"}{" "}
                 {listing.isbn}
               </span>
             )}

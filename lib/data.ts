@@ -5,8 +5,9 @@ import {
   CATEGORY_LABELS,
   CONDITION_LABELS,
   Category,
-  FILM_FORMAT_LABELS,
-  FilmFormat,
+  FORMATS_BY_TYPE,
+  FORMAT_LABELS,
+  ItemFormat,
   ListingWithSeller,
   PRODUCT_TYPE_LABELS,
   ProductType,
@@ -24,7 +25,7 @@ function toListing(row: ListingRow): ListingWithSeller {
     isbn: row.isbn,
     category: row.category as Category,
     condition: row.condition as BookCondition,
-    format: row.format ? (row.format as FilmFormat) : undefined,
+    format: row.format ? (row.format as ItemFormat) : undefined,
     price: row.price,
     originalPrice: row.originalPrice ?? undefined,
     description: row.description,
@@ -122,15 +123,23 @@ export function validateNewListing(
   const productType = input.productType ?? "bok";
   if (!(productType in PRODUCT_TYPE_LABELS)) return "Ugyldig produkttype";
   if (!input.title?.trim()) return "Tittel mangler";
-  if (!input.author?.trim())
-    return productType === "film" ? "Regissør mangler" : "Forfatter mangler";
+  if (!input.author?.trim()) {
+    if (productType === "film") return "Regissør mangler";
+    if (productType === "musikk") return "Artist mangler";
+    return "Forfatter mangler";
+  }
   if (!input.category || !(input.category in CATEGORY_LABELS))
     return "Ugyldig kategori";
   if (!categoryBelongsTo(productType as ProductType, input.category))
     return "Kategorien passer ikke produkttypen";
-  if (productType === "film") {
-    if (!input.format || !(input.format in FILM_FORMAT_LABELS))
-      return "Velg format (DVD, Blu-ray eller 4K)";
+  const validFormats = FORMATS_BY_TYPE[productType as ProductType];
+  if (validFormats.length > 0) {
+    if (!input.format || !validFormats.includes(input.format as ItemFormat)) {
+      const options = validFormats
+        .map((f) => FORMAT_LABELS[f])
+        .join(", ");
+      return `Velg format (${options})`;
+    }
   }
   if (!input.condition || !(input.condition in CONDITION_LABELS))
     return "Ugyldig tilstand";
@@ -238,11 +247,12 @@ export async function createListing(
   for (const ch of input.title) hash = (hash * 31 + ch.charCodeAt(0)) | 0;
   const coverColor = COVER_COLORS[Math.abs(hash) % COVER_COLORS.length];
 
-  const productType = input.productType ?? "bok";
+  const productType = (input.productType ?? "bok") as ProductType;
   const row = await prisma.listing.create({
     data: {
       productType,
-      format: productType === "film" ? (input.format ?? "") : "",
+      format:
+        FORMATS_BY_TYPE[productType].length > 0 ? (input.format ?? "") : "",
       title: input.title.trim(),
       author: input.author.trim(),
       isbn: input.isbn?.trim() ?? "",

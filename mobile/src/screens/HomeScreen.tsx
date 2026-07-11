@@ -16,7 +16,7 @@ import {
 import {
   BASE_URL,
   CONDITION_LABELS,
-  FILM_FORMAT_LABELS,
+  FORMAT_LABELS,
   Listing,
   ProductType,
   buyListing,
@@ -56,9 +56,7 @@ function ListingRow({
         </Text>
         <Text style={styles.author}>
           {listing.author}
-          {listing.productType === "film" && listing.format
-            ? ` · ${FILM_FORMAT_LABELS[listing.format]}`
-            : ""}
+          {listing.format ? ` · ${FORMAT_LABELS[listing.format]}` : ""}
         </Text>
         <View style={styles.cardFooter}>
           <Text style={styles.price}>{listing.price} kr</Text>
@@ -203,7 +201,7 @@ function ListingDetail({
 
         <View style={styles.priceBox}>
           <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Boken</Text>
+            <Text style={styles.priceLabel}>Varen</Text>
             <Text style={styles.priceValue}>{listing.price} kr</Text>
           </View>
           <View style={styles.priceRow}>
@@ -339,6 +337,7 @@ export default function HomeScreen() {
     { value: undefined, label: "Alt" },
     { value: "bok", label: "📚 Bøker" },
     { value: "film", label: "🎬 Film" },
+    { value: "musikk", label: "🎵 Musikk" },
   ];
 
   return (

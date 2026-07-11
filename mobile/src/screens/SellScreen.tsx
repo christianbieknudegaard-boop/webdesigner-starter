@@ -15,12 +15,15 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "react-native";
 import {
+  AUTHOR_LABELS,
   BookCondition,
   CATEGORIES_BY_TYPE,
   CONDITION_LABELS,
   CatalogBook,
-  FILM_FORMAT_LABELS,
-  FilmFormat,
+  FORMATS_BY_TYPE,
+  FORMAT_LABELS,
+  ItemFormat,
+  PRODUCT_TYPE_EMOJI,
   ProductType,
   createListing,
   lookupIsbn,
@@ -29,6 +32,19 @@ import {
 } from "../api";
 import { useAuth } from "../AuthContext";
 import { colors } from "../theme";
+
+/** «boken», «filmen», «platen» – til ledetekster. */
+const ITEM_WORD: Record<ProductType, string> = {
+  bok: "boken",
+  film: "filmen",
+  musikk: "platen",
+};
+
+const TYPE_BUTTONS: Record<ProductType, string> = {
+  bok: "Bok",
+  film: "Film",
+  musikk: "Musikk",
+};
 
 export default function SellScreen() {
   const { user } = useAuth();
@@ -39,7 +55,7 @@ export default function SellScreen() {
   const [price, setPrice] = useState("");
   const [condition, setCondition] = useState<BookCondition | null>(null);
   const [category, setCategory] = useState<string | null>(null);
-  const [format, setFormat] = useState<FilmFormat | null>(null);
+  const [format, setFormat] = useState<ItemFormat | null>(null);
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -125,14 +141,16 @@ export default function SellScreen() {
     if (!title || !author || !price || !condition || !category) {
       Alert.alert(
         "Mangler noe",
-        productType === "film"
-          ? "Fyll inn tittel, regissør, pris, kategori og tilstand."
-          : "Fyll inn tittel, forfatter, pris, kategori og tilstand."
+        `Fyll inn tittel, ${AUTHOR_LABELS[productType].toLowerCase()}, pris, kategori og tilstand.`
       );
       return;
     }
-    if (productType === "film" && !format) {
-      Alert.alert("Mangler format", "Velg DVD, Blu-ray eller 4K.");
+    const validFormats = FORMATS_BY_TYPE[productType];
+    if (validFormats.length > 0 && !format) {
+      Alert.alert(
+        "Mangler format",
+        `Velg ${validFormats.map((f) => FORMAT_LABELS[f]).join(" eller ")}.`
+      );
       return;
     }
     setSaving(true);
@@ -145,7 +163,10 @@ export default function SellScreen() {
         isbn: isbn || undefined,
         category,
         condition,
-        format: productType === "film" ? (format ?? undefined) : undefined,
+        format:
+          FORMATS_BY_TYPE[productType].length > 0
+            ? (format ?? undefined)
+            : undefined,
         price: Math.round(Number(price)),
         imageUrl,
       });
@@ -197,7 +218,8 @@ export default function SellScreen() {
             style={StyleSheet.absoluteFill}
             barcodeScannerSettings={{ barcodeTypes: ["ean13", "ean8"] }}
             onBarcodeScanned={({ data }) => {
-              if (scanned || !/^97[89]\d{10}$/.test(data)) return;
+              // EAN-13 (bøker, filmer, plater) eller EAN-8
+              if (scanned || !/^(\d{13}|\d{8})$/.test(data)) return;
               setScanned(true);
               void handleScannedIsbn(data);
             }}
@@ -223,14 +245,14 @@ export default function SellScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <Text style={styles.heading}>
-          {productType === "film" ? "Selg en film" : "Selg en bok"}
+          Selg {productType === "musikk" ? "en plate" : `en ${TYPE_BUTTONS[productType].toLowerCase()}`}
         </Text>
         <Text style={styles.sub}>
           Gratis å legge ut – vi tar først et lite gebyr ved salg.
         </Text>
 
         <View style={styles.chips}>
-          {(["bok", "film"] as ProductType[]).map((t) => (
+          {(Object.keys(TYPE_BUTTONS) as ProductType[]).map((t) => (
             <Pressable
               key={t}
               onPress={() => {
@@ -238,7 +260,9 @@ export default function SellScreen() {
                 setCategory((c) =>
                   c && c in CATEGORIES_BY_TYPE[t] ? c : null
                 );
-                if (t === "bok") setFormat(null);
+                setFormat((f) =>
+                  f && FORMATS_BY_TYPE[t].includes(f) ? f : null
+                );
               }}
               style={[styles.chip, productType === t && styles.chipActive]}
             >
@@ -248,7 +272,7 @@ export default function SellScreen() {
                   productType === t && styles.chipTextActive,
                 ]}
               >
-                {t === "film" ? "🎬 Film" : "📚 Bok"}
+                {PRODUCT_TYPE_EMOJI[t]} {TYPE_BUTTONS[t]}
               </Text>
             </Pressable>
           ))}
@@ -257,14 +281,14 @@ export default function SellScreen() {
         {/* Steg 1: Finn produktet */}
         <View style={[styles.card, { marginTop: 14 }]}>
           <Text style={styles.cardTitle}>
-            1. Finn {productType === "film" ? "filmen" : "boken"}
+            1. Finn {ITEM_WORD[productType]}
           </Text>
           <View style={styles.searchRow}>
             <TextInput
               style={[styles.input, { flex: 1 }]}
               value={search}
               onChangeText={setSearch}
-              placeholder="Søk på tittel, forfatter eller ISBN …"
+              placeholder="Søk på tittel eller strekkode …"
               placeholderTextColor={colors.muted}
             />
             <Pressable style={styles.scanButton} onPress={openScanner}>
@@ -295,27 +319,23 @@ export default function SellScreen() {
           style={styles.input}
           value={title}
           onChangeText={setTitle}
-          placeholder="Boktittel"
+          placeholder="Tittel"
           placeholderTextColor={colors.muted}
         />
 
-        <Text style={styles.label}>
-          {productType === "film" ? "Regissør" : "Forfatter"}
-        </Text>
+        <Text style={styles.label}>{AUTHOR_LABELS[productType]}</Text>
         <TextInput
           style={styles.input}
           value={author}
           onChangeText={setAuthor}
-          placeholder={
-            productType === "film" ? "Regissørens navn" : "Forfatterens navn"
-          }
+          placeholder={`${AUTHOR_LABELS[productType]}ens navn`}
           placeholderTextColor={colors.muted}
         />
 
         <Text style={styles.label}>
-          {productType === "film"
-            ? "Strekkode / EAN (valgfritt)"
-            : "ISBN (valgfritt)"}
+          {productType === "bok"
+            ? "ISBN (valgfritt)"
+            : "Strekkode / EAN (valgfritt)"}
         </Text>
         <TextInput
           style={styles.input}
@@ -358,11 +378,11 @@ export default function SellScreen() {
           )}
         </View>
 
-        {productType === "film" && (
+        {FORMATS_BY_TYPE[productType].length > 0 && (
           <>
             <Text style={styles.label}>Format</Text>
             <View style={styles.chips}>
-              {(Object.keys(FILM_FORMAT_LABELS) as FilmFormat[]).map((f) => (
+              {FORMATS_BY_TYPE[productType].map((f) => (
                 <Pressable
                   key={f}
                   onPress={() => setFormat(f)}
@@ -374,7 +394,7 @@ export default function SellScreen() {
                       format === f && styles.chipTextActive,
                     ]}
                   >
-                    {FILM_FORMAT_LABELS[f]}
+                    {FORMAT_LABELS[f]}
                   </Text>
                 </Pressable>
               ))}
@@ -403,7 +423,7 @@ export default function SellScreen() {
         </View>
 
         <Text style={styles.label}>
-          Bilde av {productType === "film" ? "filmen" : "boken"} (valgfritt)
+          Bilde av {ITEM_WORD[productType]} (valgfritt)
         </Text>
         <View style={styles.imageRow}>
           <Pressable style={styles.imageButton} onPress={() => pickImage(true)}>
