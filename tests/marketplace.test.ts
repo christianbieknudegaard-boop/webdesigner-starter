@@ -19,8 +19,12 @@ import {
 } from "@/lib/data";
 import {
   OrderError,
+  acceptCancellation,
   createOrder,
+  expireOverdueOrders,
+  extendDeadline,
   rateOrder,
+  requestCancellation,
   updateOrderStatus,
   validateAddress,
 } from "@/lib/orders";
@@ -282,6 +286,97 @@ test("rapportering: én per bruker, ikke egen annonse", async () => {
     reportListing(listing.id, reporter.id, "annet"),
     (e: unknown) => e instanceof ReportError && e.status === 409
   );
+});
+
+test("kansellering: frist, utsettelse og forespørsel", async () => {
+  const seller = await makeSeller("Selger Seks");
+  const buyer = await makeSeller("Kjøper Seks");
+  const outsider = await makeSeller("Utenfor Seks");
+
+  // 1) Sendefrist settes ved kjøp, og selger kan utsette én gang
+  const listing1 = await createListing(BOOK, seller.id);
+  const order1 = await createOrder(listing1.id, buyer.id, ADDRESS);
+  assert.ok(order1.shipDeadline && order1.shipDeadline > new Date());
+
+  await assert.rejects(
+    extendDeadline(order1.id, outsider.id),
+    (e: unknown) => e instanceof OrderError && e.status === 403
+  );
+  const extended = await extendDeadline(order1.id, seller.id);
+  assert.ok(extended.shipDeadline! > order1.shipDeadline!);
+  await assert.rejects(
+    extendDeadline(order1.id, seller.id),
+    (e: unknown) => e instanceof OrderError && e.status === 409
+  );
+
+  // 2) Kanselleringsforespørsel: kun kjøper; selger godtar -> vare relistes
+  await assert.rejects(
+    requestCancellation(order1.id, seller.id),
+    (e: unknown) => e instanceof OrderError && e.status === 403
+  );
+  await requestCancellation(order1.id, buyer.id);
+  await assert.rejects(
+    requestCancellation(order1.id, buyer.id),
+    (e: unknown) => e instanceof OrderError && e.status === 409
+  );
+  await acceptCancellation(order1.id, seller.id);
+  const relisted = await prisma.listing.findUnique({
+    where: { id: listing1.id },
+  });
+  assert.equal(relisted?.sold, false);
+  const cancelled = await prisma.order.findUnique({
+    where: { id: order1.id },
+  });
+  assert.equal(cancelled?.status, "kansellert");
+
+  // 3) Utløpt sendefrist -> automatisk kansellering + relisting
+  const listing2 = await createListing(BOOK, seller.id);
+  const order2 = await createOrder(listing2.id, buyer.id, ADDRESS);
+  await prisma.order.update({
+    where: { id: order2.id },
+    data: { shipDeadline: new Date(Date.now() - 1000) },
+  });
+  await expireOverdueOrders();
+  const expired = await prisma.order.findUnique({ where: { id: order2.id } });
+  assert.equal(expired?.status, "kansellert");
+  const relisted2 = await prisma.listing.findUnique({
+    where: { id: listing2.id },
+  });
+  assert.equal(relisted2?.sold, false);
+
+  // Selger kan ikke sende etter utløpt frist
+  const listing3 = await createListing(BOOK, seller.id);
+  const order3 = await createOrder(listing3.id, buyer.id, ADDRESS);
+  await prisma.order.update({
+    where: { id: order3.id },
+    data: { shipDeadline: new Date(Date.now() - 1000) },
+  });
+  await assert.rejects(
+    updateOrderStatus(order3.id, "sendt", seller.id),
+    (e: unknown) => e instanceof OrderError && e.status === 409
+  );
+
+  // 4) Ubesvart kanselleringsforespørsel eldre enn 48 t -> auto-kansellering
+  const listing4 = await createListing(BOOK, seller.id);
+  const order4 = await createOrder(listing4.id, buyer.id, ADDRESS);
+  await requestCancellation(order4.id, buyer.id);
+  await prisma.order.update({
+    where: { id: order4.id },
+    data: { cancelRequestedAt: new Date(Date.now() - 49 * 60 * 60 * 1000) },
+  });
+  await expireOverdueOrders();
+  const autoCancelled = await prisma.order.findUnique({
+    where: { id: order4.id },
+  });
+  assert.equal(autoCancelled?.status, "kansellert");
+
+  // 5) "Merk som sendt" avviser en fersk kanselleringsforespørsel
+  const listing5 = await createListing(BOOK, seller.id);
+  const order5 = await createOrder(listing5.id, buyer.id, ADDRESS);
+  await requestCancellation(order5.id, buyer.id);
+  const sent = await updateOrderStatus(order5.id, "sendt", seller.id);
+  assert.equal(sent.status, "sendt");
+  assert.equal(sent.cancelRequestedAt, null);
 });
 
 test("kontosletting: sperres ved aktiv ordre, anonymiserer ellers", async () => {

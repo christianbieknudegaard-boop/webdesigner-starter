@@ -154,9 +154,9 @@ export default async function ListingPage({
             </>
           )}
           <ul className="mt-4 space-y-1 text-xs text-muted">
-            <li>✓ Pengene holdes trygt til boken er levert</li>
+            <li>✓ Pengene holdes trygt til varen er levert</li>
             <li>✓ Frakt fra 45 kr med sporing</li>
-            <li>✓ Angrerett i 24 timer etter mottak</li>
+            <li>✓ Selger sender innen 5 dager – ellers kanselleres kjøpet</li>
           </ul>
           {!isOwn && (
             <ReportListingButton

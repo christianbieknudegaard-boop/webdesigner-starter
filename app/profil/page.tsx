@@ -44,6 +44,9 @@ export default async function ProfilePage() {
     totalPrice: o.itemPrice + o.shippingPrice,
     createdAt: o.createdAt.toISOString(),
     rating: o.rating,
+    shipDeadline: o.shipDeadline?.toISOString() ?? null,
+    deadlineExtended: o.deadlineExtended,
+    cancelRequestedAt: o.cancelRequestedAt?.toISOString() ?? null,
   }));
   const saleViews: OrderView[] = sales.map((o) => ({
     id: o.id,
@@ -58,6 +61,9 @@ export default async function ProfilePage() {
     shippingAddress: o.shipStreet
       ? `${o.shipName}, ${o.shipStreet}, ${o.shipPostalCode} ${o.shipCity}`
       : undefined,
+    shipDeadline: o.shipDeadline?.toISOString() ?? null,
+    deadlineExtended: o.deadlineExtended,
+    cancelRequestedAt: o.cancelRequestedAt?.toISOString() ?? null,
   }));
 
   return (

@@ -273,12 +273,13 @@ export async function buyListing(
   }
 }
 
-export type OrderStatus = "kjopt" | "sendt" | "levert";
+export type OrderStatus = "kjopt" | "sendt" | "levert" | "kansellert";
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   kjopt: "Kjøpt – venter på sending",
   sendt: "Sendt",
   levert: "Levert",
+  kansellert: "Kansellert",
 };
 
 export interface Order {
@@ -289,12 +290,39 @@ export interface Order {
   shippingPrice: number;
   rating: number | null;
   createdAt: string;
+  shipDeadline: string | null;
+  deadlineExtended: boolean;
+  cancelRequestedAt: string | null;
   shipName: string;
   shipStreet: string;
   shipPostalCode: string;
   shipCity: string;
   listing: { title: string; author: string; seller?: { name: string } };
   buyer?: { name: string };
+}
+
+/** Selger: utsett sendefristen (+2 dager, én gang). */
+export async function extendOrderDeadline(orderId: string) {
+  const res = await fetch(
+    new URL(`/api/orders/${orderId}/utsett`, BASE_URL).toString(),
+    { method: "POST", headers: authHeaders() }
+  );
+  if (!res.ok) {
+    const data = (await res.json()) as { error?: string };
+    throw new Error(data.error ?? `API-feil: ${res.status}`);
+  }
+}
+
+/** Kjøper: be om kansellering. Selger: godta forespørselen. */
+export async function requestOrAcceptCancellation(orderId: string) {
+  const res = await fetch(
+    new URL(`/api/orders/${orderId}/kansellering`, BASE_URL).toString(),
+    { method: "POST", headers: authHeaders() }
+  );
+  if (!res.ok) {
+    const data = (await res.json()) as { error?: string };
+    throw new Error(data.error ?? `API-feil: ${res.status}`);
+  }
 }
 
 /** Mine kjøp og salg (krever innlogging). */

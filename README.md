@@ -33,9 +33,13 @@ nettleseren («Legg til på hjemskjerm»).
 - 🙋 Min side med aktive annonser, solgte bøker og statistikk
 - 🖼️ Bildeopplasting: ta bilde av boken (kamera/galleri på mobil, filvelger
   på nett) – vises i annonsekort og på annonsesiden
-- 🛒 Kjøpsflyt: «Kjøp nå» med pris + frakt, boken reserveres og merkes
+- 🛒 Kjøpsflyt: «Kjøp nå» med pris + frakt, varen reserveres og merkes
   solgt; selger merker «sendt», kjøper bekrefter «mottatt» på Min side
   (selve betalingen kobles på når Vipps/Stripe-avtale er klar)
+- ⏱️ Sendefrist: selger må sende innen 5 dager (kan utsettes én gang,
+  +2 dager), ellers kanselleres kjøpet automatisk og varen relistes;
+  kjøper kan sende kanselleringsforespørsel som auto-kansellerer uten
+  svar innen 48 timer
 - 💬 Meldinger: spør selgeren direkte fra annonsen, svar i trådvisning,
   uleste-merke i menyen – egen fane i mobilappen
 - 📦 Leveringsadresse ved kjøp – selgeren ser adressen under «Mine salg»

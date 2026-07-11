@@ -18,6 +18,11 @@ export interface OrderView {
   shippingAddress?: string;
   /** Kjøperens vurdering (1–5), null hvis ikke gitt ennå. */
   rating?: number | null;
+  /** Selgers sendefrist (ISO), null for gamle/fullførte ordrer. */
+  shipDeadline?: string | null;
+  deadlineExtended?: boolean;
+  /** Når kjøperen ba om kansellering (ISO), null ellers. */
+  cancelRequestedAt?: string | null;
 }
 
 interface Props {
@@ -63,6 +68,24 @@ export default function OrderCard({ order, role }: Props) {
         ? { status: "levert", label: "Bekreft mottatt" }
         : null;
 
+  async function post(path: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(path, { method: "POST" });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setError(data.error ?? "Noe gikk galt. Prøv igjen.");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError("Fikk ikke kontakt med serveren. Prøv igjen.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function runAction(status: string) {
     setBusy(true);
     setError(null);
@@ -98,9 +121,27 @@ export default function OrderCard({ order, role }: Props) {
           {order.author} · {order.counterpartLabel} ·{" "}
           {new Date(order.createdAt).toLocaleDateString("nb-NO")}
         </p>
-        {role === "seller" && order.shippingAddress && (
+        {role === "seller" && order.status !== "kansellert" && order.shippingAddress && (
           <p className="mt-1 text-sm text-foreground/80">
             📦 Sendes til: {order.shippingAddress}
+          </p>
+        )}
+        {order.status === "kjopt" && order.shipDeadline && (
+          <p className="mt-1 text-sm text-muted">
+            ⏱️ Sendes innen{" "}
+            {new Date(order.shipDeadline).toLocaleDateString("nb-NO", {
+              day: "numeric",
+              month: "long",
+            })}
+            {order.deadlineExtended ? " (utsatt)" : ""}
+            {" – ellers kanselleres kjøpet automatisk"}
+          </p>
+        )}
+        {order.status === "kjopt" && order.cancelRequestedAt && (
+          <p className="mt-1 rounded-lg bg-accent/10 px-3 py-1.5 text-sm font-medium text-accent">
+            {role === "buyer"
+              ? "Kanselleringsforespørsel sendt – kanselleres automatisk hvis selgeren ikke svarer innen 48 timer."
+              : "Kjøperen ønsker å kansellere. Send varen eller godta kanselleringen – uten svar innen 48 timer kanselleres ordren."}
           </p>
         )}
         {role === "buyer" && order.rating != null && (
@@ -131,13 +172,15 @@ export default function OrderCard({ order, role }: Props) {
           <p className="mt-1 text-xs font-medium text-accent">{error}</p>
         )}
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2">
         <p className="font-bold text-brand-dark">{order.totalPrice} kr</p>
         <span
           className={`rounded-full px-3 py-1 text-xs font-medium ${
             order.status === "levert"
               ? "bg-brand text-white"
-              : "bg-brand-light text-brand-dark"
+              : order.status === "kansellert"
+                ? "bg-border text-muted"
+                : "bg-brand-light text-brand-dark"
           }`}
         >
           {order.statusLabel}
@@ -151,6 +194,39 @@ export default function OrderCard({ order, role }: Props) {
             {busy ? "Lagrer …" : action.label}
           </button>
         )}
+        {role === "seller" &&
+          order.status === "kjopt" &&
+          !order.deadlineExtended && (
+            <button
+              onClick={() => post(`/api/orders/${order.id}/utsett`)}
+              disabled={busy}
+              className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted transition hover:border-brand hover:text-brand-dark disabled:opacity-60"
+            >
+              Utsett frist +2 dager
+            </button>
+          )}
+        {role === "seller" &&
+          order.status === "kjopt" &&
+          order.cancelRequestedAt && (
+            <button
+              onClick={() => post(`/api/orders/${order.id}/kansellering`)}
+              disabled={busy}
+              className="rounded-full border border-accent px-3 py-1.5 text-xs font-medium text-accent transition hover:bg-accent/10 disabled:opacity-60"
+            >
+              Godta kansellering
+            </button>
+          )}
+        {role === "buyer" &&
+          order.status === "kjopt" &&
+          !order.cancelRequestedAt && (
+            <button
+              onClick={() => post(`/api/orders/${order.id}/kansellering`)}
+              disabled={busy}
+              className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted transition hover:border-accent hover:text-accent disabled:opacity-60"
+            >
+              Be om kansellering
+            </button>
+          )}
       </div>
     </div>
   );

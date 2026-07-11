@@ -48,6 +48,10 @@ function toListing(row: ListingRow): ListingWithSeller {
 export async function getListing(
   id: string
 ): Promise<ListingWithSeller | undefined> {
+  // Rydd opp i utløpte ordrer først, så en vare med utløpt sendefrist
+  // vises som tilgjengelig igjen.
+  const { expireOverdueOrders } = await import("@/lib/orders");
+  await expireOverdueOrders();
   const row = await prisma.listing.findUnique({
     where: { id },
     include: { seller: true },

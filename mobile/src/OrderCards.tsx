@@ -3,7 +3,9 @@ import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import {
   ORDER_STATUS_LABELS,
   Order,
+  extendOrderDeadline,
   rateOrder,
+  requestOrAcceptCancellation,
   setOrderStatus,
 } from "./api";
 import { colors } from "./theme";
@@ -56,6 +58,18 @@ export default function OrderCard({ order, role, onChanged }: Props) {
     }
   }
 
+  async function run(fn: () => Promise<void>) {
+    setBusy(true);
+    try {
+      await fn();
+      onChanged();
+    } catch (e) {
+      Alert.alert("Noe gikk galt", e instanceof Error ? e.message : "Prøv igjen.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <View style={styles.card}>
       <View style={styles.headerRow}>
@@ -69,10 +83,30 @@ export default function OrderCard({ order, role, onChanged }: Props) {
         {new Date(order.createdAt).toLocaleDateString("nb-NO")}
       </Text>
 
-      {role === "seller" && order.shipStreet ? (
+      {role === "seller" && order.status !== "kansellert" && order.shipStreet ? (
         <Text style={styles.address}>
           📦 Sendes til: {order.shipName}, {order.shipStreet},{" "}
           {order.shipPostalCode} {order.shipCity}
+        </Text>
+      ) : null}
+
+      {order.status === "kjopt" && order.shipDeadline ? (
+        <Text style={styles.meta}>
+          ⏱️ Sendes innen{" "}
+          {new Date(order.shipDeadline).toLocaleDateString("nb-NO", {
+            day: "numeric",
+            month: "long",
+          })}
+          {order.deadlineExtended ? " (utsatt)" : ""} – ellers kanselleres
+          kjøpet
+        </Text>
+      ) : null}
+
+      {order.status === "kjopt" && order.cancelRequestedAt ? (
+        <Text style={styles.cancelNotice}>
+          {role === "buyer"
+            ? "Kanselleringsforespørsel sendt – kanselleres automatisk uten svar innen 48 t."
+            : "Kjøperen ønsker å kansellere. Send varen eller godta – uten svar innen 48 t kanselleres ordren."}
         </Text>
       ) : null}
 
@@ -97,6 +131,38 @@ export default function OrderCard({ order, role, onChanged }: Props) {
           </Pressable>
         )}
       </View>
+
+      {order.status === "kjopt" && (
+        <View style={styles.secondaryRow}>
+          {role === "seller" && !order.deadlineExtended && (
+            <Pressable
+              style={[styles.secondaryButton, busy && { opacity: 0.6 }]}
+              onPress={() => run(() => extendOrderDeadline(order.id))}
+              disabled={busy}
+            >
+              <Text style={styles.secondaryText}>Utsett frist +2 dager</Text>
+            </Pressable>
+          )}
+          {role === "seller" && order.cancelRequestedAt && (
+            <Pressable
+              style={[styles.secondaryButton, busy && { opacity: 0.6 }]}
+              onPress={() => run(() => requestOrAcceptCancellation(order.id))}
+              disabled={busy}
+            >
+              <Text style={styles.cancelText}>Godta kansellering</Text>
+            </Pressable>
+          )}
+          {role === "buyer" && !order.cancelRequestedAt && (
+            <Pressable
+              style={[styles.secondaryButton, busy && { opacity: 0.6 }]}
+              onPress={() => run(() => requestOrAcceptCancellation(order.id))}
+              disabled={busy}
+            >
+              <Text style={styles.secondaryText}>Be om kansellering</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
 
       {role === "buyer" && order.status === "levert" && (
         order.rating != null ? (
@@ -156,6 +222,26 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   statusDone: { backgroundColor: colors.brand, color: "#fff" },
+  cancelNotice: {
+    backgroundColor: "rgba(217,121,65,0.1)",
+    color: colors.accent,
+    fontSize: 12,
+    fontWeight: "600",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginTop: 4,
+  },
+  secondaryRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6 },
+  secondaryButton: {
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  secondaryText: { color: colors.muted, fontSize: 12, fontWeight: "600" },
+  cancelText: { color: colors.accent, fontSize: 12, fontWeight: "700" },
   actionButton: {
     backgroundColor: colors.accent,
     borderRadius: 16,

@@ -109,7 +109,8 @@ model Message {
 }
 
 // Kjøp av en annonse. Betaling kobles på senere (Vipps/Stripe);
-// statusflyten er kjopt -> sendt -> levert.
+// statusflyten er kjopt -> sendt -> levert, eller kjopt -> kansellert
+// (utløpt sendefrist eller ubesvart kanselleringsforespørsel).
 model Order {
   id            String   @id @default(cuid())
   listing       Listing  @relation(fields: [listingId], references: [id])
@@ -117,6 +118,11 @@ model Order {
   buyer         Seller   @relation("BuyerOrders", fields: [buyerId], references: [id])
   buyerId       String
   status        String   @default("kjopt")
+  // Selgers frist for å sende; kan utsettes én gang
+  shipDeadline     DateTime?
+  deadlineExtended Boolean   @default(false)
+  // Kjøperens kanselleringsforespørsel; auto-kansellering uten svar
+  cancelRequestedAt DateTime?
   itemPrice     Int
   shippingPrice Int      @default(45)
   // Leveringsadresse (fylles inn ved kjøp)
