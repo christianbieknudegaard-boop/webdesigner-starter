@@ -78,9 +78,11 @@ export default function Home() {
       setError(null);
       try {
         const result = await parseModelFile(file);
+        analysisToken.current++;
         setObject(result.object);
         setStats(result.stats);
         setScale(1);
+        setMeasureMode(false);
         setMeasurePoints([]);
         resetShellState();
         resetMoldState();
@@ -91,7 +93,7 @@ export default function Home() {
         setHealth(null);
 
         if (mesh) {
-          const token = ++analysisToken.current;
+          const token = analysisToken.current;
           analyzeMeshInWorker(mesh.geometry)
             .then((report) => {
               if (analysisToken.current === token) setHealth(report);
@@ -124,11 +126,19 @@ export default function Home() {
     setRepairedCount(null);
   }, [resetShellState, resetMoldState]);
 
-  const handleScaleChange = useCallback((next: number) => {
-    if (!Number.isFinite(next) || next <= 0) return;
-    setScale(next);
-    setMeasurePoints([]);
-  }, []);
+  const handleScaleChange = useCallback(
+    (next: number) => {
+      if (!Number.isFinite(next) || next <= 0) return;
+      analysisToken.current++; // discard in-flight shell/mold built for the old scale
+      setScale(next);
+      setMeasurePoints([]);
+      // Shell and mold were computed with wall/margin divided by the old
+      // scale; keeping them would bake the new scale into old geometry.
+      resetShellState();
+      resetMoldState();
+    },
+    [resetShellState, resetMoldState]
+  );
 
   const handleMeasureClick = useCallback((point: THREE.Vector3) => {
     setMeasurePoints((prev) => (prev.length >= 2 ? [point] : [...prev, point]));
@@ -177,11 +187,13 @@ export default function Home() {
 
       setIsShelling(true);
       setShellError(null);
+      const token = analysisToken.current;
 
       // Defer so the "Behandler..." state actually gets a chance to paint
       // before the synchronous geometry work runs on the main thread.
       setTimeout(() => {
         try {
+          if (analysisToken.current !== token) return; // model changed meanwhile
           const thicknessMm = unit === 'in' ? thicknessInCurrentUnit / MM_TO_INCH : thicknessInCurrentUnit;
           const nativeThickness = thicknessMm / scale;
           const result = createShell(baseGeometry, nativeThickness);
@@ -207,27 +219,40 @@ export default function Home() {
   }, [baseGeometry, stats, isHollow, shellGeometry, scale]);
 
   const handleGenerateMold = useCallback(
-    async (marginInCurrentUnit: number, axis: SplitAxis, options: MoldOptions) => {
+    async (
+      marginInCurrentUnit: number,
+      axis: SplitAxis,
+      panelOptions: Omit<MoldOptions, 'upAxis'>
+    ) => {
       if (!baseGeometry || !(marginInCurrentUnit > 0)) return;
+      // STL is Z-up, OBJ is Y-up - the pour funnel should exit the model's top.
+      const options: MoldOptions = {
+        ...panelOptions,
+        upAxis: stats?.format === 'obj' ? 'y' : 'z',
+      };
 
       setIsMoldGenerating(true);
       setMoldError(null);
+      const token = analysisToken.current;
 
       try {
         const marginMm = unit === 'in' ? marginInCurrentUnit / MM_TO_INCH : marginInCurrentUnit;
         const nativeMargin = marginMm / scale;
         // Heavy CSG runs in a Web Worker so the viewer stays responsive.
         const result = await generateMoldInWorker(baseGeometry, nativeMargin, axis, options);
+        if (analysisToken.current !== token) return; // model changed meanwhile
         setMoldResult(result);
         setShowMold(true);
         setMeasurePoints([]);
       } catch (err) {
-        setMoldError(err instanceof Error ? err.message : 'Kunne ikke generere mold.');
+        if (analysisToken.current === token) {
+          setMoldError(err instanceof Error ? err.message : 'Kunne ikke generere mold.');
+        }
       } finally {
-        setIsMoldGenerating(false);
+        if (analysisToken.current === token) setIsMoldGenerating(false);
       }
     },
-    [baseGeometry, unit, scale]
+    [baseGeometry, unit, scale, stats]
   );
 
   const handleDownloadMoldHalf = useCallback(
@@ -354,6 +379,7 @@ export default function Home() {
                   unit={unit}
                   onUnitChange={setUnit}
                   onScaleChange={handleScaleChange}
+                  onDownload={handleDownload}
                   onReset={handleReset}
                 />
                 <RepairPanel
@@ -372,7 +398,10 @@ export default function Home() {
                   triangleCount={shellTriangleCount}
                   transparent={transparentView}
                   onHollow={handleHollow}
-                  onToggleHollow={() => setIsHollow((prev) => !prev)}
+                  onToggleHollow={() => {
+                    setIsHollow((prev) => !prev);
+                    setMeasurePoints([]);
+                  }}
                   onToggleTransparent={() => setTransparentView((prev) => !prev)}
                   onDownload={handleDownload}
                 />
@@ -389,7 +418,10 @@ export default function Home() {
                     moldResult ? (moldResult.siliconeVolume * scale ** 3) / 1000 : null
                   }
                   onGenerate={handleGenerateMold}
-                  onToggleShowMold={() => setShowMold((prev) => !prev)}
+                  onToggleShowMold={() => {
+                    setShowMold((prev) => !prev);
+                    setMeasurePoints([]);
+                  }}
                   onDownloadHalf={handleDownloadMoldHalf}
                 />
               </aside>

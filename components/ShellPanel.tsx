@@ -18,6 +18,8 @@ interface ShellPanelProps {
   onDownload: () => void;
 }
 
+const MM_PER_INCH = 25.4;
+
 export default function ShellPanel({
   supported,
   unit,
@@ -32,6 +34,17 @@ export default function ShellPanel({
   onDownload,
 }: ShellPanelProps) {
   const [thickness, setThickness] = useState(unit === 'mm' ? 2 : 0.08);
+
+  // Convert the entered value when the unit changes, so "2 mm" doesn't
+  // silently become "2 in" (state adjusted during render).
+  const [lastUnit, setLastUnit] = useState(unit);
+  if (unit !== lastUnit) {
+    setLastUnit(unit);
+    if (Number.isFinite(thickness)) {
+      const converted = unit === 'mm' ? thickness * MM_PER_INCH : thickness / MM_PER_INCH;
+      setThickness(Number(converted.toFixed(unit === 'mm' ? 2 : 3)));
+    }
+  }
 
   return (
     <details className="w-full rounded-xl border border-slate-700 bg-slate-900/80 p-4 backdrop-blur-sm">

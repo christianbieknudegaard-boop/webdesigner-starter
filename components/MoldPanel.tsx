@@ -16,7 +16,7 @@ interface MoldPanelProps {
   siliconeMl: number | null;
   demold: DemoldAxisReport[] | null;
   recommendedAxis: SplitAxis | null;
-  onGenerate: (margin: number, axis: SplitAxis, options: MoldOptions) => void;
+  onGenerate: (margin: number, axis: SplitAxis, options: Omit<MoldOptions, 'upAxis'>) => void;
   onToggleShowMold: () => void;
   onDownloadHalf: (half: 'A' | 'B') => void;
 }
@@ -58,6 +58,18 @@ export default function MoldPanel({
   if (recommendedAxis !== lastRecommended) {
     setLastRecommended(recommendedAxis);
     if (recommendedAxis) setAxis(recommendedAxis);
+  }
+
+  // Convert the entered margin when the unit changes, so "5 mm" doesn't
+  // silently become "5 in" (= 127 mm of mold wall).
+  const MM_PER_INCH = 25.4;
+  const [lastUnit, setLastUnit] = useState(unit);
+  if (unit !== lastUnit) {
+    setLastUnit(unit);
+    if (Number.isFinite(margin)) {
+      const converted = unit === 'mm' ? margin * MM_PER_INCH : margin / MM_PER_INCH;
+      setMargin(Number(converted.toFixed(unit === 'mm' ? 1 : 3)));
+    }
   }
 
   return (

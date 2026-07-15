@@ -8,6 +8,8 @@ export interface MoldOptions {
   registrationKeys: boolean;
   bandGrooves: boolean;
   prySlots: boolean;
+  /** The model's up direction in native coordinates: 'z' for STL, 'y' for OBJ. */
+  upAxis: SplitAxis;
 }
 
 export interface MoldResult {
@@ -147,6 +149,7 @@ export function generateMold(
     registrationKeys: true,
     bandGrooves: true,
     prySlots: true,
+    upAxis: 'z',
   }
 ): MoldResult {
   if (!(margin > 0)) {
@@ -178,8 +181,11 @@ export function generateMold(
   let cavityBrush = evaluator.evaluate(boxBrush, modelBrush, SUBTRACTION);
 
   // Pour along an axis that lies in the parting plane, so the channel is
-  // shared between the two halves. Native Z is "up" for STL models.
-  const pourAxis: SplitAxis = splitAxis === 'z' ? 'y' : 'z';
+  // shared between the two halves. Prefer the model's up direction (Z for
+  // STL, Y for OBJ); if that IS the split axis, fall back to a side axis.
+  const upAxis = options.upAxis ?? 'z';
+  const pourAxis: SplitAxis =
+    splitAxis === upAxis ? (upAxis === 'z' ? 'y' : 'z') : upAxis;
   const thirdAxis = ALL_AXES.find((axis) => axis !== splitAxis && axis !== pourAxis)!;
 
   if (options.pourChannel) {

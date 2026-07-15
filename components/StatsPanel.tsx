@@ -14,6 +14,7 @@ interface StatsPanelProps {
   unit: Unit;
   onUnitChange: (unit: Unit) => void;
   onScaleChange: (scale: number) => void;
+  onDownload: () => void;
   onReset: () => void;
 }
 
@@ -23,6 +24,7 @@ export default function StatsPanel({
   unit,
   onUnitChange,
   onScaleChange,
+  onDownload,
   onReset,
 }: StatsPanelProps) {
   const factor = unit === 'mm' ? 1 : MM_TO_INCH;
@@ -99,12 +101,20 @@ export default function StatsPanel({
         <Row label="Punkter" value={stats.vertexCount.toLocaleString('nb-NO')} />
       </dl>
 
-      <button
-        onClick={onReset}
-        className="mt-4 w-full rounded-md border border-slate-600 py-1.5 text-xs text-slate-300 hover:border-slate-400 hover:text-white"
-      >
-        Last opp ny modell
-      </button>
+      <div className="mt-4 space-y-2">
+        <button
+          onClick={onDownload}
+          className="w-full rounded-md border border-blue-500/60 bg-blue-500/10 py-1.5 text-xs text-blue-100 hover:border-blue-400"
+        >
+          Last ned STL
+        </button>
+        <button
+          onClick={onReset}
+          className="w-full rounded-md border border-slate-600 py-1.5 text-xs text-slate-300 hover:border-slate-400 hover:text-white"
+        >
+          Last opp ny modell
+        </button>
+      </div>
     </div>
   );
 }
