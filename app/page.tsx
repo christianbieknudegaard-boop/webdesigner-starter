@@ -8,10 +8,12 @@ import StatsPanel from '@/components/StatsPanel';
 import MeasureOverlay from '@/components/MeasureOverlay';
 import ShellPanel from '@/components/ShellPanel';
 import RepairPanel from '@/components/RepairPanel';
+import MoldPanel from '@/components/MoldPanel';
 import RoadmapSection from '@/components/RoadmapSection';
 import { parseModelFile } from '@/lib/parseModel';
 import { createShell } from '@/lib/shellModel';
 import { analyzeMesh, repairMesh, type MeshHealthReport } from '@/lib/meshRepair';
+import { generateMold, type MoldResult, type SplitAxis } from '@/lib/moldGenerator';
 import { downloadGeometryAsSTL } from '@/lib/exportModel';
 import { getSingleMesh } from '@/lib/meshUtils';
 import type { ModelStats } from '@/types/model';
@@ -44,12 +46,24 @@ export default function Home() {
   const [shellError, setShellError] = useState<string | null>(null);
   const [transparentView, setTransparentView] = useState(false);
 
+  const [moldResult, setMoldResult] = useState<MoldResult | null>(null);
+  const [isMoldGenerating, setIsMoldGenerating] = useState(false);
+  const [moldError, setMoldError] = useState<string | null>(null);
+  const [showMold, setShowMold] = useState(false);
+
   const resetShellState = useCallback(() => {
     setShellGeometry(null);
     setShellTriangleCount(null);
     setIsHollow(false);
     setShellError(null);
     setTransparentView(false);
+  }, []);
+
+  const resetMoldState = useCallback(() => {
+    setMoldResult(null);
+    setIsMoldGenerating(false);
+    setMoldError(null);
+    setShowMold(false);
   }, []);
 
   const handleFile = useCallback(
@@ -63,6 +77,7 @@ export default function Home() {
         setScale(1);
         setMeasurePoints([]);
         resetShellState();
+        resetMoldState();
         setRepairedCount(null);
 
         const mesh = getSingleMesh(result.object);
@@ -74,7 +89,7 @@ export default function Home() {
         setIsLoading(false);
       }
     },
-    [resetShellState]
+    [resetShellState, resetMoldState]
   );
 
   const handleReset = useCallback(() => {
@@ -85,10 +100,11 @@ export default function Home() {
     setMeasureMode(false);
     setMeasurePoints([]);
     resetShellState();
+    resetMoldState();
     setBaseGeometry(null);
     setHealth(null);
     setRepairedCount(null);
-  }, [resetShellState]);
+  }, [resetShellState, resetMoldState]);
 
   const handleScaleChange = useCallback((next: number) => {
     if (!Number.isFinite(next) || next <= 0) return;
@@ -118,12 +134,13 @@ export default function Home() {
         setHealth(analyzeMesh(result.geometry));
         setRepairedCount(result.holesFilled);
         resetShellState();
+        resetMoldState();
         setMeasurePoints([]);
       } finally {
         setIsRepairing(false);
       }
     }, 20);
-  }, [baseGeometry, resetShellState]);
+  }, [baseGeometry, resetShellState, resetMoldState]);
 
   const handleHollow = useCallback(
     (thicknessInCurrentUnit: number) => {
@@ -160,7 +177,77 @@ export default function Home() {
     downloadGeometryAsSTL(geometry, scale, `${baseName}-meshforge.stl`);
   }, [baseGeometry, stats, isHollow, shellGeometry, scale]);
 
+  const handleGenerateMold = useCallback(
+    (marginInCurrentUnit: number, axis: SplitAxis) => {
+      if (!baseGeometry || !(marginInCurrentUnit > 0)) return;
+
+      setIsMoldGenerating(true);
+      setMoldError(null);
+
+      setTimeout(() => {
+        try {
+          const marginMm = unit === 'in' ? marginInCurrentUnit / MM_TO_INCH : marginInCurrentUnit;
+          const nativeMargin = marginMm / scale;
+          const result = generateMold(baseGeometry, nativeMargin, axis);
+          setMoldResult(result);
+          setShowMold(true);
+          setMeasurePoints([]);
+        } catch (err) {
+          setMoldError(err instanceof Error ? err.message : 'Kunne ikke generere mold.');
+        } finally {
+          setIsMoldGenerating(false);
+        }
+      }, 20);
+    },
+    [baseGeometry, unit, scale]
+  );
+
+  const handleDownloadMoldHalf = useCallback(
+    (half: 'A' | 'B') => {
+      if (!moldResult || !stats) return;
+      const geometry = half === 'A' ? moldResult.halfA : moldResult.halfB;
+      const baseName = stats.fileName.replace(/\.[^.]+$/, '');
+      downloadGeometryAsSTL(geometry, scale, `${baseName}-mold-${half}.stl`);
+    },
+    [moldResult, stats, scale]
+  );
+
+  const moldDisplayObject = useMemo(() => {
+    if (!moldResult) return null;
+
+    const axisIndex = { x: 0, y: 1, z: 2 }[moldResult.splitAxis] as 0 | 1 | 2;
+    const gap = moldResult.boxSize[moldResult.splitAxis] * 0.15;
+    const offset = new THREE.Vector3();
+    offset.setComponent(axisIndex, gap);
+
+    const materialA = new THREE.MeshStandardMaterial({
+      color: '#2dd4bf',
+      roughness: 0.4,
+      metalness: 0.05,
+      side: THREE.DoubleSide,
+    });
+    const materialB = new THREE.MeshStandardMaterial({
+      color: '#f59e0b',
+      roughness: 0.4,
+      metalness: 0.05,
+      side: THREE.DoubleSide,
+    });
+
+    const meshA = new THREE.Mesh(moldResult.halfA, materialA);
+    const meshB = new THREE.Mesh(moldResult.halfB, materialB);
+    meshA.position.copy(offset);
+    meshB.position.copy(offset).multiplyScalar(-1);
+
+    const group = new THREE.Group();
+    group.add(meshA, meshB);
+    if (stats?.format === 'stl') {
+      group.rotation.x = -Math.PI / 2;
+    }
+    return group;
+  }, [moldResult, stats]);
+
   const displayObject = useMemo(() => {
+    if (showMold && moldDisplayObject) return moldDisplayObject;
     if (!object || !singleMesh) return object;
     if (isHollow && shellGeometry) {
       const mesh = new THREE.Mesh(shellGeometry, singleMesh.material);
@@ -173,7 +260,7 @@ export default function Home() {
       return mesh;
     }
     return object;
-  }, [object, singleMesh, isHollow, shellGeometry, baseGeometry]);
+  }, [showMold, moldDisplayObject, object, singleMesh, isHollow, shellGeometry, baseGeometry]);
 
   const distance =
     measurePoints.length === 2 ? measurePoints[0].distanceTo(measurePoints[1]) : null;
@@ -246,6 +333,17 @@ export default function Home() {
                 onToggleHollow={() => setIsHollow((prev) => !prev)}
                 onToggleTransparent={() => setTransparentView((prev) => !prev)}
                 onDownload={handleDownload}
+              />
+              <MoldPanel
+                supported={singleMesh !== null}
+                unit={unit}
+                isGenerating={isMoldGenerating}
+                error={moldError}
+                hasResult={moldResult !== null}
+                showMold={showMold}
+                onGenerate={handleGenerateMold}
+                onToggleShowMold={() => setShowMold((prev) => !prev)}
+                onDownloadHalf={handleDownloadMoldHalf}
               />
             </>
           )}

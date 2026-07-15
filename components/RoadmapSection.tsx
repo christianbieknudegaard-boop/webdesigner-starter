@@ -21,7 +21,7 @@ const TOOLS = [
     icon: '🧊',
     title: 'Mold-generator',
     description: 'Last opp en modell og få en automatisk splittet, 3D-printbar støpeform generert rundt den.',
-    status: 'Planlagt',
+    status: 'Klart',
   },
 ] as const;
 
