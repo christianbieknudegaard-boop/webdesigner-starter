@@ -13,7 +13,7 @@ import RoadmapSection from '@/components/RoadmapSection';
 import { parseModelFile } from '@/lib/parseModel';
 import { createShell } from '@/lib/shellModel';
 import { analyzeMesh, repairMesh, type MeshHealthReport } from '@/lib/meshRepair';
-import { generateMold, type MoldResult, type SplitAxis } from '@/lib/moldGenerator';
+import { generateMold, type MoldOptions, type MoldResult, type SplitAxis } from '@/lib/moldGenerator';
 import { downloadGeometryAsSTL } from '@/lib/exportModel';
 import { getSingleMesh } from '@/lib/meshUtils';
 import type { ModelStats } from '@/types/model';
@@ -178,7 +178,7 @@ export default function Home() {
   }, [baseGeometry, stats, isHollow, shellGeometry, scale]);
 
   const handleGenerateMold = useCallback(
-    (marginInCurrentUnit: number, axis: SplitAxis) => {
+    (marginInCurrentUnit: number, axis: SplitAxis, options: MoldOptions) => {
       if (!baseGeometry || !(marginInCurrentUnit > 0)) return;
 
       setIsMoldGenerating(true);
@@ -188,7 +188,7 @@ export default function Home() {
         try {
           const marginMm = unit === 'in' ? marginInCurrentUnit / MM_TO_INCH : marginInCurrentUnit;
           const nativeMargin = marginMm / scale;
-          const result = generateMold(baseGeometry, nativeMargin, axis);
+          const result = generateMold(baseGeometry, nativeMargin, axis, options);
           setMoldResult(result);
           setShowMold(true);
           setMeasurePoints([]);

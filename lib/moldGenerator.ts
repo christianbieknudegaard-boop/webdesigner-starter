@@ -1,7 +1,12 @@
 import * as THREE from 'three';
-import { Brush, Evaluator, SUBTRACTION, INTERSECTION } from 'three-bvh-csg';
+import { Brush, Evaluator, SUBTRACTION, INTERSECTION, ADDITION } from 'three-bvh-csg';
 
 export type SplitAxis = 'x' | 'y' | 'z';
+
+export interface MoldOptions {
+  pourChannel: boolean;
+  registrationKeys: boolean;
+}
 
 export interface MoldResult {
   halfA: THREE.BufferGeometry;
@@ -11,6 +16,19 @@ export interface MoldResult {
 }
 
 const AXIS_INDEX: Record<SplitAxis, 0 | 1 | 2> = { x: 0, y: 1, z: 2 };
+const ALL_AXES: SplitAxis[] = ['x', 'y', 'z'];
+
+function brushAt(
+  geometry: THREE.BufferGeometry,
+  position: THREE.Vector3,
+  rotation?: THREE.Euler
+): Brush {
+  const brush = new Brush(geometry);
+  brush.position.copy(position);
+  if (rotation) brush.rotation.copy(rotation);
+  brush.updateMatrixWorld();
+  return brush;
+}
 
 function buildHalfSpaceBrush(
   center: THREE.Vector3,
@@ -27,25 +45,33 @@ function buildHalfSpaceBrush(
   dims[axisIndex] = largeExtent;
 
   const geometry = new THREE.BoxGeometry(dims[0], dims[1], dims[2]);
-  const brush = new Brush(geometry);
+  const position = center.clone();
+  position.setComponent(axisIndex, splitValue + (side * largeExtent) / 2);
+  return brushAt(geometry, position);
+}
 
-  const position: [number, number, number] = [center.x, center.y, center.z];
-  position[axisIndex] = splitValue + (side * largeExtent) / 2;
-  brush.position.set(position[0], position[1], position[2]);
-  brush.updateMatrixWorld();
-
-  return brush;
+// CylinderGeometry's axis is Y; rotate it to run along the requested axis.
+function cylinderRotationFor(axis: SplitAxis): THREE.Euler {
+  if (axis === 'z') return new THREE.Euler(Math.PI / 2, 0, 0);
+  if (axis === 'x') return new THREE.Euler(0, 0, -Math.PI / 2);
+  return new THREE.Euler();
 }
 
 /**
  * Generates a two-part 3D-printable mold around a model: an enclosing box
  * with the model's shape subtracted out to form the cavity, split into two
  * halves along the chosen axis through the model's center.
+ *
+ * Optionally adds a pour channel with funnel (centered on the parting plane,
+ * so each half carries half the channel) and four spherical registration
+ * keys - bumps on half B, matching recesses with clearance in half A - so
+ * the halves align when clamped together.
  */
 export function generateMold(
   sourceGeometry: THREE.BufferGeometry,
   margin: number,
-  splitAxis: SplitAxis
+  splitAxis: SplitAxis,
+  options: MoldOptions = { pourChannel: true, registrationKeys: true }
 ): MoldResult {
   if (!(margin > 0)) {
     throw new Error('Randmargin må være større enn 0.');
@@ -64,22 +90,92 @@ export function generateMold(
   const modelBrush = new Brush(modelGeometry);
   modelBrush.updateMatrixWorld();
 
-  const boxGeometry = new THREE.BoxGeometry(outerSize.x, outerSize.y, outerSize.z);
-  const boxBrush = new Brush(boxGeometry);
-  boxBrush.position.copy(center);
-  boxBrush.updateMatrixWorld();
+  const boxBrush = brushAt(
+    new THREE.BoxGeometry(outerSize.x, outerSize.y, outerSize.z),
+    center
+  );
 
   const evaluator = new Evaluator();
   // STL geometries have no UV data; restrict to attributes every brush shares.
   evaluator.attributes = ['position', 'normal'];
-  const cavityBrush = evaluator.evaluate(boxBrush, modelBrush, SUBTRACTION);
+  let cavityBrush = evaluator.evaluate(boxBrush, modelBrush, SUBTRACTION);
+
+  if (options.pourChannel) {
+    // Pour along an axis that lies in the parting plane, so the channel is
+    // shared between the two halves. Native Z is "up" for STL models.
+    const pourAxis: SplitAxis = splitAxis === 'z' ? 'y' : 'z';
+    const pourIndex = AXIS_INDEX[pourAxis];
+    const rotation = cylinderRotationFor(pourAxis);
+
+    const channelRadius = margin * 0.5;
+    const overlap = margin * 0.5; // reach into the cavity so the channel connects
+    const funnelHeight = margin * 0.7;
+    const modelTop = box.max.getComponent(pourIndex);
+    const outerTop = modelTop + margin;
+
+    const neckBottom = modelTop - overlap;
+    const neckTop = outerTop - funnelHeight;
+    const neckHeight = neckTop - neckBottom;
+
+    const neckCenter = center.clone();
+    neckCenter.setComponent(pourIndex, neckBottom + neckHeight / 2);
+    const neckBrush = brushAt(
+      new THREE.CylinderGeometry(channelRadius, channelRadius, neckHeight, 24),
+      neckCenter,
+      rotation
+    );
+    cavityBrush = evaluator.evaluate(cavityBrush, neckBrush, SUBTRACTION);
+
+    // Funnel flares out toward the top surface for easy pouring. Extend it a
+    // hair past the surface so the boolean cut is unambiguous.
+    const funnelCenter = center.clone();
+    funnelCenter.setComponent(pourIndex, neckTop + (funnelHeight + margin * 0.02) / 2);
+    const funnelBrush = brushAt(
+      new THREE.CylinderGeometry(channelRadius * 2.2, channelRadius, funnelHeight + margin * 0.02, 24),
+      funnelCenter,
+      rotation
+    );
+    cavityBrush = evaluator.evaluate(cavityBrush, funnelBrush, SUBTRACTION);
+  }
 
   const splitValue = center.getComponent(AXIS_INDEX[splitAxis]);
   const sideABrush = buildHalfSpaceBrush(center, outerSize, splitAxis, splitValue, 1);
   const sideBBrush = buildHalfSpaceBrush(center, outerSize, splitAxis, splitValue, -1);
 
-  const halfABrush = evaluator.evaluate(cavityBrush, sideABrush, INTERSECTION);
-  const halfBBrush = evaluator.evaluate(cavityBrush, sideBBrush, INTERSECTION);
+  let halfABrush = evaluator.evaluate(cavityBrush, sideABrush, INTERSECTION);
+  let halfBBrush = evaluator.evaluate(cavityBrush, sideBBrush, INTERSECTION);
+
+  if (options.registrationKeys) {
+    const [axisU, axisV] = ALL_AXES.filter((axis) => axis !== splitAxis);
+    const keyRadius = margin * 0.35;
+    const clearance = 1.12; // recesses slightly larger than bumps so the halves seat
+
+    for (const signU of [-1, 1]) {
+      for (const signV of [-1, 1]) {
+        const position = center.clone();
+        position.setComponent(AXIS_INDEX[splitAxis], splitValue);
+        position.setComponent(
+          AXIS_INDEX[axisU],
+          center.getComponent(AXIS_INDEX[axisU]) +
+            signU * (outerSize.getComponent(AXIS_INDEX[axisU]) / 2 - margin / 2)
+        );
+        position.setComponent(
+          AXIS_INDEX[axisV],
+          center.getComponent(AXIS_INDEX[axisV]) +
+            signV * (outerSize.getComponent(AXIS_INDEX[axisV]) / 2 - margin / 2)
+        );
+
+        const bumpBrush = brushAt(new THREE.SphereGeometry(keyRadius, 16, 16), position);
+        const recessBrush = brushAt(
+          new THREE.SphereGeometry(keyRadius * clearance, 16, 16),
+          position
+        );
+
+        halfBBrush = evaluator.evaluate(halfBBrush, bumpBrush, ADDITION);
+        halfABrush = evaluator.evaluate(halfABrush, recessBrush, SUBTRACTION);
+      }
+    }
+  }
 
   halfABrush.geometry.computeVertexNormals();
   halfBBrush.geometry.computeVertexNormals();

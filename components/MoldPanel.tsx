@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { SplitAxis } from '@/lib/moldGenerator';
+import type { MoldOptions, SplitAxis } from '@/lib/moldGenerator';
 
 type Unit = 'mm' | 'in';
 
@@ -12,7 +12,7 @@ interface MoldPanelProps {
   error: string | null;
   hasResult: boolean;
   showMold: boolean;
-  onGenerate: (margin: number, axis: SplitAxis) => void;
+  onGenerate: (margin: number, axis: SplitAxis, options: MoldOptions) => void;
   onToggleShowMold: () => void;
   onDownloadHalf: (half: 'A' | 'B') => void;
 }
@@ -30,6 +30,8 @@ export default function MoldPanel({
 }: MoldPanelProps) {
   const [margin, setMargin] = useState(unit === 'mm' ? 5 : 0.2);
   const [axis, setAxis] = useState<SplitAxis>('z');
+  const [pourChannel, setPourChannel] = useState(true);
+  const [registrationKeys, setRegistrationKeys] = useState(true);
 
   return (
     <div className="absolute bottom-4 left-1/2 w-72 -translate-x-1/2 rounded-xl border border-slate-700 bg-slate-900/80 p-4 backdrop-blur-sm">
@@ -72,8 +74,27 @@ export default function MoldPanel({
             </select>
           </div>
 
+          <div className="mt-2 space-y-1.5 text-xs">
+            <label className="flex items-center gap-2 text-slate-400">
+              <input
+                type="checkbox"
+                checked={pourChannel}
+                onChange={() => setPourChannel((prev) => !prev)}
+              />
+              Hellekanal med trakt
+            </label>
+            <label className="flex items-center gap-2 text-slate-400">
+              <input
+                type="checkbox"
+                checked={registrationKeys}
+                onChange={() => setRegistrationKeys((prev) => !prev)}
+              />
+              Styrepinner (kulelås)
+            </label>
+          </div>
+
           <button
-            onClick={() => onGenerate(margin, axis)}
+            onClick={() => onGenerate(margin, axis, { pourChannel, registrationKeys })}
             disabled={isGenerating || !(margin > 0)}
             className="mt-3 w-full rounded-md border border-slate-600 py-1.5 text-xs text-slate-200 hover:border-slate-400 disabled:opacity-50"
           >
