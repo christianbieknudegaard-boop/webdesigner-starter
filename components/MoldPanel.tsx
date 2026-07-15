@@ -12,6 +12,7 @@ interface MoldPanelProps {
   error: string | null;
   hasResult: boolean;
   showMold: boolean;
+  siliconeMl: number | null;
   onGenerate: (margin: number, axis: SplitAxis, options: MoldOptions) => void;
   onToggleShowMold: () => void;
   onDownloadHalf: (half: 'A' | 'B') => void;
@@ -24,6 +25,7 @@ export default function MoldPanel({
   error,
   hasResult,
   showMold,
+  siliconeMl,
   onGenerate,
   onToggleShowMold,
   onDownloadHalf,
@@ -34,8 +36,10 @@ export default function MoldPanel({
   const [registrationKeys, setRegistrationKeys] = useState(true);
 
   return (
-    <div className="absolute bottom-4 left-1/2 w-72 -translate-x-1/2 rounded-xl border border-slate-700 bg-slate-900/80 p-4 backdrop-blur-sm">
-      <h3 className="text-sm font-semibold text-slate-100">Mold-generator</h3>
+    <details className="w-full rounded-xl border border-slate-700 bg-slate-900/80 p-4 backdrop-blur-sm">
+      <summary className="cursor-pointer list-none text-sm font-semibold text-slate-100 select-none [&::-webkit-details-marker]:hidden">
+        Mold-generator
+      </summary>
 
       {!supported ? (
         <p className="mt-2 text-xs text-slate-400">
@@ -105,6 +109,14 @@ export default function MoldPanel({
 
           {hasResult && (
             <div className="mt-3 space-y-2 border-t border-slate-800 pt-3">
+              {siliconeMl !== null && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-400">Silikonbehov</span>
+                  <span className="text-slate-200">
+                    ~{siliconeMl < 10 ? siliconeMl.toFixed(1) : Math.round(siliconeMl)} ml
+                  </span>
+                </div>
+              )}
               <button
                 onClick={onToggleShowMold}
                 className="w-full rounded-md border border-slate-600 py-1.5 text-xs text-slate-200 hover:border-slate-400"
@@ -129,6 +141,6 @@ export default function MoldPanel({
           )}
         </>
       )}
-    </div>
+    </details>
   );
 }

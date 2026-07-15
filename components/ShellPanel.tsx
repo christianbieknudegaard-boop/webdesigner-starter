@@ -34,8 +34,10 @@ export default function ShellPanel({
   const [thickness, setThickness] = useState(unit === 'mm' ? 2 : 0.08);
 
   return (
-    <div className="absolute bottom-4 right-4 w-64 rounded-xl border border-slate-700 bg-slate-900/80 p-4 backdrop-blur-sm">
-      <h3 className="text-sm font-semibold text-slate-100">Hul-gjøring</h3>
+    <details className="w-full rounded-xl border border-slate-700 bg-slate-900/80 p-4 backdrop-blur-sm">
+      <summary className="cursor-pointer list-none text-sm font-semibold text-slate-100 select-none [&::-webkit-details-marker]:hidden">
+        Hul-gjøring
+      </summary>
 
       {!supported ? (
         <p className="mt-2 text-xs text-slate-400">
@@ -97,6 +99,6 @@ export default function ShellPanel({
           )}
         </>
       )}
-    </div>
+    </details>
   );
 }

@@ -39,7 +39,7 @@ export default function StatsPanel({
   };
 
   return (
-    <div className="absolute top-4 right-4 w-64 rounded-xl border border-slate-700 bg-slate-900/80 p-4 backdrop-blur-sm">
+    <div className="w-full rounded-xl border border-slate-700 bg-slate-900/80 p-4 backdrop-blur-sm">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-slate-100">Modellinfo</h3>
         <button

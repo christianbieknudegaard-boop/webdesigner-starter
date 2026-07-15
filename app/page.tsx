@@ -13,7 +13,8 @@ import RoadmapSection from '@/components/RoadmapSection';
 import { parseModelFile } from '@/lib/parseModel';
 import { createShell } from '@/lib/shellModel';
 import { analyzeMesh, repairMesh, type MeshHealthReport } from '@/lib/meshRepair';
-import { generateMold, type MoldOptions, type MoldResult, type SplitAxis } from '@/lib/moldGenerator';
+import type { MoldOptions, SplitAxis } from '@/lib/moldGenerator';
+import { generateMoldInWorker, type MoldClientResult } from '@/lib/moldClient';
 import { downloadGeometryAsSTL } from '@/lib/exportModel';
 import { getSingleMesh } from '@/lib/meshUtils';
 import type { ModelStats } from '@/types/model';
@@ -46,7 +47,7 @@ export default function Home() {
   const [shellError, setShellError] = useState<string | null>(null);
   const [transparentView, setTransparentView] = useState(false);
 
-  const [moldResult, setMoldResult] = useState<MoldResult | null>(null);
+  const [moldResult, setMoldResult] = useState<MoldClientResult | null>(null);
   const [isMoldGenerating, setIsMoldGenerating] = useState(false);
   const [moldError, setMoldError] = useState<string | null>(null);
   const [showMold, setShowMold] = useState(false);
@@ -178,26 +179,25 @@ export default function Home() {
   }, [baseGeometry, stats, isHollow, shellGeometry, scale]);
 
   const handleGenerateMold = useCallback(
-    (marginInCurrentUnit: number, axis: SplitAxis, options: MoldOptions) => {
+    async (marginInCurrentUnit: number, axis: SplitAxis, options: MoldOptions) => {
       if (!baseGeometry || !(marginInCurrentUnit > 0)) return;
 
       setIsMoldGenerating(true);
       setMoldError(null);
 
-      setTimeout(() => {
-        try {
-          const marginMm = unit === 'in' ? marginInCurrentUnit / MM_TO_INCH : marginInCurrentUnit;
-          const nativeMargin = marginMm / scale;
-          const result = generateMold(baseGeometry, nativeMargin, axis, options);
-          setMoldResult(result);
-          setShowMold(true);
-          setMeasurePoints([]);
-        } catch (err) {
-          setMoldError(err instanceof Error ? err.message : 'Kunne ikke generere mold.');
-        } finally {
-          setIsMoldGenerating(false);
-        }
-      }, 20);
+      try {
+        const marginMm = unit === 'in' ? marginInCurrentUnit / MM_TO_INCH : marginInCurrentUnit;
+        const nativeMargin = marginMm / scale;
+        // Heavy CSG runs in a Web Worker so the viewer stays responsive.
+        const result = await generateMoldInWorker(baseGeometry, nativeMargin, axis, options);
+        setMoldResult(result);
+        setShowMold(true);
+        setMeasurePoints([]);
+      } catch (err) {
+        setMoldError(err instanceof Error ? err.message : 'Kunne ikke generere mold.');
+      } finally {
+        setIsMoldGenerating(false);
+      }
     },
     [baseGeometry, unit, scale]
   );
@@ -298,14 +298,6 @@ export default function Home() {
           {!object && <UploadZone onFile={handleFile} isLoading={isLoading} error={error} />}
           {object && stats && (
             <>
-              <StatsPanel
-                stats={stats}
-                scale={scale}
-                unit={unit}
-                onUnitChange={setUnit}
-                onScaleChange={handleScaleChange}
-                onReset={handleReset}
-              />
               <MeasureOverlay
                 active={measureMode}
                 onToggle={handleToggleMeasure}
@@ -314,37 +306,50 @@ export default function Home() {
                 unit={unit}
                 onReset={() => setMeasurePoints([])}
               />
-              <RepairPanel
-                supported={singleMesh !== null}
-                health={health}
-                isRepairing={isRepairing}
-                lastRepairCount={repairedCount}
-                onRepair={handleRepair}
-              />
-              <ShellPanel
-                supported={singleMesh !== null}
-                unit={unit}
-                isHollow={isHollow}
-                isProcessing={isShelling}
-                error={shellError}
-                triangleCount={shellTriangleCount}
-                transparent={transparentView}
-                onHollow={handleHollow}
-                onToggleHollow={() => setIsHollow((prev) => !prev)}
-                onToggleTransparent={() => setTransparentView((prev) => !prev)}
-                onDownload={handleDownload}
-              />
-              <MoldPanel
-                supported={singleMesh !== null}
-                unit={unit}
-                isGenerating={isMoldGenerating}
-                error={moldError}
-                hasResult={moldResult !== null}
-                showMold={showMold}
-                onGenerate={handleGenerateMold}
-                onToggleShowMold={() => setShowMold((prev) => !prev)}
-                onDownloadHalf={handleDownloadMoldHalf}
-              />
+              <aside className="absolute inset-y-0 right-0 w-72 space-y-3 overflow-y-auto p-4 max-sm:w-64">
+                <StatsPanel
+                  stats={stats}
+                  scale={scale}
+                  unit={unit}
+                  onUnitChange={setUnit}
+                  onScaleChange={handleScaleChange}
+                  onReset={handleReset}
+                />
+                <RepairPanel
+                  supported={singleMesh !== null}
+                  health={health}
+                  isRepairing={isRepairing}
+                  lastRepairCount={repairedCount}
+                  onRepair={handleRepair}
+                />
+                <ShellPanel
+                  supported={singleMesh !== null}
+                  unit={unit}
+                  isHollow={isHollow}
+                  isProcessing={isShelling}
+                  error={shellError}
+                  triangleCount={shellTriangleCount}
+                  transparent={transparentView}
+                  onHollow={handleHollow}
+                  onToggleHollow={() => setIsHollow((prev) => !prev)}
+                  onToggleTransparent={() => setTransparentView((prev) => !prev)}
+                  onDownload={handleDownload}
+                />
+                <MoldPanel
+                  supported={singleMesh !== null}
+                  unit={unit}
+                  isGenerating={isMoldGenerating}
+                  error={moldError}
+                  hasResult={moldResult !== null}
+                  showMold={showMold}
+                  siliconeMl={
+                    moldResult ? (moldResult.siliconeVolume * scale ** 3) / 1000 : null
+                  }
+                  onGenerate={handleGenerateMold}
+                  onToggleShowMold={() => setShowMold((prev) => !prev)}
+                  onDownloadHalf={handleDownloadMoldHalf}
+                />
+              </aside>
             </>
           )}
         </section>

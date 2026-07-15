@@ -18,8 +18,10 @@ export default function RepairPanel({
   onRepair,
 }: RepairPanelProps) {
   return (
-    <div className="absolute bottom-4 left-4 w-64 rounded-xl border border-slate-700 bg-slate-900/80 p-4 backdrop-blur-sm">
-      <h3 className="text-sm font-semibold text-slate-100">Meshhelse</h3>
+    <details open className="w-full rounded-xl border border-slate-700 bg-slate-900/80 p-4 backdrop-blur-sm">
+      <summary className="cursor-pointer list-none text-sm font-semibold text-slate-100 select-none [&::-webkit-details-marker]:hidden">
+        Meshhelse
+      </summary>
 
       {!supported ? (
         <p className="mt-2 text-xs text-slate-400">
@@ -67,6 +69,6 @@ export default function RepairPanel({
       {lastRepairCount !== null && lastRepairCount > 0 && (
         <p className="mt-2 text-xs text-emerald-300">✓ {lastRepairCount} hull reparert</p>
       )}
-    </div>
+    </details>
   );
 }

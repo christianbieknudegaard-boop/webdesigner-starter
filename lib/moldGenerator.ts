@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Brush, Evaluator, SUBTRACTION, INTERSECTION, ADDITION } from 'three-bvh-csg';
+import { Brush, Evaluator, SUBTRACTION, INTERSECTION, ADDITION, computeMeshVolume } from 'three-bvh-csg';
 
 export type SplitAxis = 'x' | 'y' | 'z';
 
@@ -193,4 +193,15 @@ export function generateMold(
     splitAxis,
     boxSize: { x: outerSize.x, y: outerSize.y, z: outerSize.z },
   };
+}
+
+/**
+ * Estimates the silicone needed to fill the assembled mold: the outer box
+ * volume minus the solid material of both halves equals the empty space
+ * inside (cavity + pour channel + key clearance). Native model units cubed.
+ */
+export function computeSiliconeVolume(result: MoldResult): number {
+  const boxVolume = result.boxSize.x * result.boxSize.y * result.boxSize.z;
+  const solidVolume = computeMeshVolume(result.halfA) + computeMeshVolume(result.halfB);
+  return Math.max(0, boxVolume - solidVolume);
 }
