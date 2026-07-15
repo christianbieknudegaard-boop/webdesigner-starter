@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import * as THREE from 'three';
 import UploadZone from '@/components/UploadZone';
@@ -12,7 +12,8 @@ import MoldPanel from '@/components/MoldPanel';
 import RoadmapSection from '@/components/RoadmapSection';
 import { parseModelFile } from '@/lib/parseModel';
 import { createShell } from '@/lib/shellModel';
-import { analyzeMesh, repairMesh, type MeshHealthReport } from '@/lib/meshRepair';
+import type { MeshHealthReport } from '@/lib/meshRepair';
+import { analyzeMeshInWorker, repairMeshInWorker } from '@/lib/meshClient';
 import type { MoldOptions, SplitAxis } from '@/lib/moldGenerator';
 import { generateMoldInWorker, type MoldClientResult } from '@/lib/moldClient';
 import { analyzeDemoldability, recommendSplitAxis } from '@/lib/demoldAnalysis';
@@ -53,6 +54,9 @@ export default function Home() {
   const [moldError, setMoldError] = useState<string | null>(null);
   const [showMold, setShowMold] = useState(false);
 
+  // Guards async worker results against arriving after the model changed.
+  const analysisToken = useRef(0);
+
   const resetShellState = useCallback(() => {
     setShellGeometry(null);
     setShellTriangleCount(null);
@@ -84,7 +88,18 @@ export default function Home() {
 
         const mesh = getSingleMesh(result.object);
         setBaseGeometry(mesh?.geometry ?? null);
-        setHealth(mesh ? analyzeMesh(mesh.geometry) : null);
+        setHealth(null);
+
+        if (mesh) {
+          const token = ++analysisToken.current;
+          analyzeMeshInWorker(mesh.geometry)
+            .then((report) => {
+              if (analysisToken.current === token) setHealth(report);
+            })
+            .catch(() => {
+              /* health stays unknown; tools still work */
+            });
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Kunne ikke lese filen.');
       } finally {
@@ -95,6 +110,7 @@ export default function Home() {
   );
 
   const handleReset = useCallback(() => {
+    analysisToken.current++;
     setObject(null);
     setStats(null);
     setError(null);
@@ -134,23 +150,25 @@ export default function Home() {
     [demoldReports]
   );
 
-  const handleRepair = useCallback(() => {
+  const handleRepair = useCallback(async () => {
     if (!baseGeometry) return;
     setIsRepairing(true);
+    const token = ++analysisToken.current;
 
-    setTimeout(() => {
-      try {
-        const result = repairMesh(baseGeometry);
-        setBaseGeometry(result.geometry);
-        setHealth(analyzeMesh(result.geometry));
-        setRepairedCount(result.holesFilled);
-        resetShellState();
-        resetMoldState();
-        setMeasurePoints([]);
-      } finally {
-        setIsRepairing(false);
-      }
-    }, 20);
+    try {
+      const result = await repairMeshInWorker(baseGeometry);
+      if (analysisToken.current !== token) return; // model changed meanwhile
+      setBaseGeometry(result.geometry);
+      setHealth(result.report);
+      setRepairedCount(result.holesFilled);
+      resetShellState();
+      resetMoldState();
+      setMeasurePoints([]);
+    } catch {
+      /* leave state untouched on failure */
+    } finally {
+      setIsRepairing(false);
+    }
   }, [baseGeometry, resetShellState, resetMoldState]);
 
   const handleHollow = useCallback(
@@ -295,7 +313,15 @@ export default function Home() {
       </header>
 
       <main>
-        <section className="relative h-[75vh] w-full overflow-hidden border-b border-slate-800/80">
+        <section
+          className="relative h-[75vh] w-full overflow-hidden border-b border-slate-800/80"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            const file = e.dataTransfer.files?.[0];
+            if (file) handleFile(file);
+          }}
+        >
           <ModelViewer
             object={displayObject}
             scale={scale}
@@ -306,6 +332,11 @@ export default function Home() {
             transparent={transparentView}
           />
           {!object && <UploadZone onFile={handleFile} isLoading={isLoading} error={error} />}
+          {object && error && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 rounded-lg border border-red-500/50 bg-red-950/80 px-4 py-2 text-xs text-red-200 backdrop-blur-sm">
+              {error}
+            </div>
+          )}
           {object && stats && (
             <>
               <MeasureOverlay

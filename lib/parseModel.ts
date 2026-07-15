@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { ensureOutwardWinding } from '@/lib/meshUtils';
 import type { ModelFormat, ModelStats } from '@/types/model';
 
 const MODEL_COLOR = '#4f8ff7';
@@ -66,6 +68,34 @@ function assertHasMesh(object: THREE.Object3D) {
   }
 }
 
+/**
+ * OBJ files often contain several sub-meshes (one per `o`/`g` group). The
+ * tools (repair, shell, mold) operate on a single geometry, so bake each
+ * mesh's world transform and merge them into one. Attributes are reduced to
+ * positions - normals are recomputed, and materials get replaced anyway.
+ */
+function mergeToSingleMesh(object: THREE.Object3D): THREE.Object3D {
+  const meshes: THREE.Mesh[] = [];
+  object.traverse((child) => {
+    if (child instanceof THREE.Mesh) meshes.push(child);
+  });
+  if (meshes.length <= 1) return object;
+
+  object.updateWorldMatrix(true, true);
+  const parts = meshes.map((mesh) => {
+    const source = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry.clone();
+    const stripped = new THREE.BufferGeometry();
+    stripped.setAttribute('position', source.attributes.position);
+    stripped.applyMatrix4(mesh.matrixWorld);
+    return stripped;
+  });
+
+  const merged = mergeGeometries(parts, false);
+  if (!merged) return object;
+  merged.computeVertexNormals();
+  return new THREE.Mesh(merged);
+}
+
 export async function parseModelFile(file: File): Promise<ParsedModel> {
   const extension = file.name.split('.').pop()?.toLowerCase();
 
@@ -95,6 +125,10 @@ export async function parseModelFile(file: File): Promise<ParsedModel> {
   }
 
   assertHasMesh(object);
+  object = mergeToSingleMesh(object);
+  object.traverse((child) => {
+    if (child instanceof THREE.Mesh) ensureOutwardWinding(child.geometry);
+  });
   applyStandardMaterial(object);
 
   // Compute stats in the file's native axes before any display-only rotation,
