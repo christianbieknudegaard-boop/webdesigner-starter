@@ -7,9 +7,11 @@ import UploadZone from '@/components/UploadZone';
 import StatsPanel from '@/components/StatsPanel';
 import MeasureOverlay from '@/components/MeasureOverlay';
 import ShellPanel from '@/components/ShellPanel';
+import RepairPanel from '@/components/RepairPanel';
 import RoadmapSection from '@/components/RoadmapSection';
 import { parseModelFile } from '@/lib/parseModel';
 import { createShell } from '@/lib/shellModel';
+import { analyzeMesh, repairMesh, type MeshHealthReport } from '@/lib/meshRepair';
 import { downloadGeometryAsSTL } from '@/lib/exportModel';
 import { getSingleMesh } from '@/lib/meshUtils';
 import type { ModelStats } from '@/types/model';
@@ -29,6 +31,11 @@ export default function Home() {
 
   const [measureMode, setMeasureMode] = useState(false);
   const [measurePoints, setMeasurePoints] = useState<THREE.Vector3[]>([]);
+
+  const [baseGeometry, setBaseGeometry] = useState<THREE.BufferGeometry | null>(null);
+  const [health, setHealth] = useState<MeshHealthReport | null>(null);
+  const [isRepairing, setIsRepairing] = useState(false);
+  const [repairedCount, setRepairedCount] = useState<number | null>(null);
 
   const [shellGeometry, setShellGeometry] = useState<THREE.BufferGeometry | null>(null);
   const [shellTriangleCount, setShellTriangleCount] = useState<number | null>(null);
@@ -56,6 +63,11 @@ export default function Home() {
         setScale(1);
         setMeasurePoints([]);
         resetShellState();
+        setRepairedCount(null);
+
+        const mesh = getSingleMesh(result.object);
+        setBaseGeometry(mesh?.geometry ?? null);
+        setHealth(mesh ? analyzeMesh(mesh.geometry) : null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Kunne ikke lese filen.');
       } finally {
@@ -73,6 +85,9 @@ export default function Home() {
     setMeasureMode(false);
     setMeasurePoints([]);
     resetShellState();
+    setBaseGeometry(null);
+    setHealth(null);
+    setRepairedCount(null);
   }, [resetShellState]);
 
   const handleScaleChange = useCallback((next: number) => {
@@ -92,9 +107,27 @@ export default function Home() {
 
   const singleMesh = useMemo(() => (object ? getSingleMesh(object) : null), [object]);
 
+  const handleRepair = useCallback(() => {
+    if (!baseGeometry) return;
+    setIsRepairing(true);
+
+    setTimeout(() => {
+      try {
+        const result = repairMesh(baseGeometry);
+        setBaseGeometry(result.geometry);
+        setHealth(analyzeMesh(result.geometry));
+        setRepairedCount(result.holesFilled);
+        resetShellState();
+        setMeasurePoints([]);
+      } finally {
+        setIsRepairing(false);
+      }
+    }, 20);
+  }, [baseGeometry, resetShellState]);
+
   const handleHollow = useCallback(
     (thicknessInCurrentUnit: number) => {
-      if (!singleMesh || !(thicknessInCurrentUnit > 0)) return;
+      if (!baseGeometry || !(thicknessInCurrentUnit > 0)) return;
 
       setIsShelling(true);
       setShellError(null);
@@ -105,7 +138,7 @@ export default function Home() {
         try {
           const thicknessMm = unit === 'in' ? thicknessInCurrentUnit / MM_TO_INCH : thicknessInCurrentUnit;
           const nativeThickness = thicknessMm / scale;
-          const result = createShell(singleMesh.geometry, nativeThickness);
+          const result = createShell(baseGeometry, nativeThickness);
           setShellGeometry(result.geometry);
           setShellTriangleCount(result.triangleCount);
           setIsHollow(true);
@@ -117,22 +150,30 @@ export default function Home() {
         }
       }, 20);
     },
-    [singleMesh, unit, scale]
+    [baseGeometry, unit, scale]
   );
 
   const handleDownload = useCallback(() => {
-    if (!singleMesh || !stats) return;
-    const geometry = isHollow && shellGeometry ? shellGeometry : singleMesh.geometry;
+    if (!baseGeometry || !stats) return;
+    const geometry = isHollow && shellGeometry ? shellGeometry : baseGeometry;
     const baseName = stats.fileName.replace(/\.[^.]+$/, '');
     downloadGeometryAsSTL(geometry, scale, `${baseName}-meshforge.stl`);
-  }, [singleMesh, stats, isHollow, shellGeometry, scale]);
+  }, [baseGeometry, stats, isHollow, shellGeometry, scale]);
 
   const displayObject = useMemo(() => {
-    if (!object || !isHollow || !shellGeometry || !singleMesh) return object;
-    const mesh = new THREE.Mesh(shellGeometry, singleMesh.material);
-    mesh.rotation.copy(object.rotation);
-    return mesh;
-  }, [object, isHollow, shellGeometry, singleMesh]);
+    if (!object || !singleMesh) return object;
+    if (isHollow && shellGeometry) {
+      const mesh = new THREE.Mesh(shellGeometry, singleMesh.material);
+      mesh.rotation.copy(object.rotation);
+      return mesh;
+    }
+    if (baseGeometry && baseGeometry !== singleMesh.geometry) {
+      const mesh = new THREE.Mesh(baseGeometry, singleMesh.material);
+      mesh.rotation.copy(object.rotation);
+      return mesh;
+    }
+    return object;
+  }, [object, singleMesh, isHollow, shellGeometry, baseGeometry]);
 
   const distance =
     measurePoints.length === 2 ? measurePoints[0].distanceTo(measurePoints[1]) : null;
@@ -185,6 +226,13 @@ export default function Home() {
                 pointCount={measurePoints.length}
                 unit={unit}
                 onReset={() => setMeasurePoints([])}
+              />
+              <RepairPanel
+                supported={singleMesh !== null}
+                health={health}
+                isRepairing={isRepairing}
+                lastRepairCount={repairedCount}
+                onRepair={handleRepair}
               />
               <ShellPanel
                 supported={singleMesh !== null}

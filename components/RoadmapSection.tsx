@@ -12,15 +12,15 @@ const TOOLS = [
     status: 'Klart',
   },
   {
+    icon: '🩹',
+    title: 'Mesh-reparasjon',
+    description: 'Finn og tett hull i modellen automatisk, og få varsel om ikke-manifold kanter.',
+    status: 'Klart',
+  },
+  {
     icon: '🧊',
     title: 'Mold-generator',
     description: 'Last opp en modell og få en automatisk splittet, 3D-printbar støpeform generert rundt den.',
-    status: 'Planlagt',
-  },
-  {
-    icon: '🩹',
-    title: 'Mesh-reparasjon',
-    description: 'Finn og fiks hull, ikke-manifold kanter og andre feil i STL-filer før videre bruk.',
     status: 'Planlagt',
   },
 ] as const;

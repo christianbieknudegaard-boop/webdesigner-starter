@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { weldByPosition } from '@/lib/meshUtils';
 
 export interface ShellResult {
   geometry: THREE.BufferGeometry;
@@ -50,7 +51,7 @@ export function createShell(sourceGeometry: THREE.BufferGeometry, wallThickness:
     throw new Error('Veggtykkelsen må være større enn 0.');
   }
 
-  const outer = mergeVertices(sourceGeometry);
+  const outer = weldByPosition(sourceGeometry);
   outer.computeVertexNormals();
 
   const maxOffset = estimateMaxSafeOffset(outer);
