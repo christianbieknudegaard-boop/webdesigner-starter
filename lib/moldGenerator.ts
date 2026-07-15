@@ -177,6 +177,15 @@ export function generateMold(
     }
   }
 
+  // The evaluator emits result geometry in the FIRST brush's local frame and
+  // parks that frame on the returned brush's transform (see Evaluator.js:
+  // "assign brush A's transform to the result"). Bake it back into the
+  // geometry so the halves land in the source model's coordinate system.
+  for (const brush of [halfABrush, halfBBrush]) {
+    brush.updateMatrixWorld();
+    brush.geometry.applyMatrix4(brush.matrixWorld);
+  }
+
   halfABrush.geometry.computeVertexNormals();
   halfBBrush.geometry.computeVertexNormals();
 
