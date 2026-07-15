@@ -13,13 +13,29 @@ import RoadmapSection from '@/components/RoadmapSection';
 import { parseModelFile } from '@/lib/parseModel';
 import { createShell } from '@/lib/shellModel';
 import type { MeshHealthReport } from '@/lib/meshRepair';
-import { analyzeMeshInWorker, runGeometryOp, type GeometryOpResult } from '@/lib/meshClient';
+import {
+  analyzeMeshInWorker,
+  runGeometryOp,
+  thicknessInWorker,
+  type GeometryOpResult,
+  type ThicknessClientResult,
+} from '@/lib/meshClient';
 import OptimizePanel, { type OptimizeOp } from '@/components/OptimizePanel';
 import type { MoldOptions, SplitAxis } from '@/lib/moldGenerator';
-import { generateMoldInWorker, type MoldClientResult } from '@/lib/moldClient';
+import {
+  generateMoldInWorker,
+  cutInWorker,
+  engraveInWorker,
+  type MoldClientResult,
+  type CutClientResult,
+} from '@/lib/moldClient';
+import CutPanel from '@/components/CutPanel';
+import EngravePanel from '@/components/EngravePanel';
+import type { FaceSide } from '@/lib/csgTools';
 import { analyzeDemoldability, recommendSplitAxis } from '@/lib/demoldAnalysis';
 import { downloadGeometryAsSTL } from '@/lib/exportModel';
-import { getSingleMesh } from '@/lib/meshUtils';
+import { getSingleMesh, computeVolume, dominantFaceNormal, ensureOutwardWinding } from '@/lib/meshUtils';
+import TransformPanel, { type RotateAxis } from '@/components/TransformPanel';
 import type { ModelStats } from '@/types/model';
 
 const ModelViewer = dynamic(() => import('@/components/ModelViewer'), { ssr: false });
@@ -61,19 +77,41 @@ export default function Home() {
   // Guards async worker results against arriving after the model changed.
   const analysisToken = useRef(0);
 
+  const [thicknessResult, setThicknessResult] = useState<ThicknessClientResult | null>(null);
+  const [thicknessBusy, setThicknessBusy] = useState(false);
+  const [showThickness, setShowThickness] = useState(false);
+
+  // Also clears the thickness heat map - it belongs to the old geometry.
   const resetShellState = useCallback(() => {
     setShellGeometry(null);
     setShellTriangleCount(null);
     setIsHollow(false);
     setShellError(null);
     setTransparentView(false);
+    setThicknessResult(null);
+    setThicknessBusy(false);
+    setShowThickness(false);
   }, []);
 
+  const [cutResult, setCutResult] = useState<CutClientResult | null>(null);
+  const [isCutting, setIsCutting] = useState(false);
+  const [cutError, setCutError] = useState<string | null>(null);
+  const [showCut, setShowCut] = useState(false);
+  const [isEngraving, setIsEngraving] = useState(false);
+  const [engraveError, setEngraveError] = useState<string | null>(null);
+
+  // Clears every CSG-derived result (mold, cut, engrave errors).
   const resetMoldState = useCallback(() => {
     setMoldResult(null);
     setIsMoldGenerating(false);
     setMoldError(null);
     setShowMold(false);
+    setCutResult(null);
+    setIsCutting(false);
+    setCutError(null);
+    setShowCut(false);
+    setIsEngraving(false);
+    setEngraveError(null);
   }, []);
 
   const handleFile = useCallback(
@@ -165,6 +203,64 @@ export default function Home() {
     () => (demoldReports ? recommendSplitAxis(demoldReports) : null),
     [demoldReports]
   );
+
+  const volumeNative = useMemo(
+    () => (baseGeometry ? computeVolume(baseGeometry) : null),
+    [baseGeometry]
+  );
+
+  /** Bakes an orientation change into the base geometry. Topology is
+   *  untouched, so mesh health carries over; everything geometric resets. */
+  const applyTransform = useCallback(
+    (mutate: (geometry: THREE.BufferGeometry) => void) => {
+      if (!baseGeometry) return;
+      analysisToken.current++; // discard in-flight results for the old orientation
+      const next = baseGeometry.clone();
+      mutate(next);
+      next.computeVertexNormals();
+      next.computeBoundingBox();
+      const size = next.boundingBox!.getSize(new THREE.Vector3());
+      setBaseGeometry(next);
+      setStats((prev) =>
+        prev ? { ...prev, dimensions: { x: size.x, y: size.y, z: size.z } } : prev
+      );
+      resetShellState();
+      resetMoldState();
+      setMeasurePoints([]);
+    },
+    [baseGeometry, resetShellState, resetMoldState]
+  );
+
+  const handleRotate = useCallback(
+    (axis: RotateAxis) => {
+      applyTransform((geometry) => {
+        if (axis === 'x') geometry.rotateX(Math.PI / 2);
+        else if (axis === 'y') geometry.rotateY(Math.PI / 2);
+        else geometry.rotateZ(Math.PI / 2);
+      });
+    },
+    [applyTransform]
+  );
+
+  const handleMirror = useCallback(() => {
+    applyTransform((geometry) => {
+      geometry.scale(-1, 1, 1);
+      ensureOutwardWinding(geometry); // mirroring flips the winding
+    });
+  }, [applyTransform]);
+
+  const handleLayFlat = useCallback(() => {
+    applyTransform((geometry) => {
+      const normal = dominantFaceNormal(geometry);
+      if (!normal) return;
+      const down = new THREE.Vector3();
+      // Native down: -Z for Z-up formats (STL/PLY), -Y for Y-up (OBJ/GLB).
+      if (stats?.format === 'obj' || stats?.format === 'glb') down.set(0, -1, 0);
+      else down.set(0, 0, -1);
+      const rotation = new THREE.Quaternion().setFromUnitVectors(normal, down);
+      geometry.applyQuaternion(rotation);
+    });
+  }, [applyTransform, stats]);
 
   /** Runs a geometry-transforming worker op and swaps in the result,
    *  invalidating everything derived from the old geometry. */
@@ -282,7 +378,7 @@ export default function Home() {
       // STL is Z-up, OBJ is Y-up - the pour funnel should exit the model's top.
       const options: MoldOptions = {
         ...panelOptions,
-        upAxis: stats?.format === 'obj' ? 'y' : 'z',
+        upAxis: stats?.format === 'obj' || stats?.format === 'glb' ? 'y' : 'z',
       };
 
       setIsMoldGenerating(true);
@@ -319,6 +415,160 @@ export default function Home() {
     [moldResult, stats, scale]
   );
 
+  const handleCheckThickness = useCallback(
+    async (minInUnit: number) => {
+      if (!baseGeometry || !(minInUnit > 0)) return;
+      setThicknessBusy(true);
+      const token = analysisToken.current;
+      try {
+        const minNative = ((unit === 'in' ? minInUnit / MM_TO_INCH : minInUnit)) / scale;
+        const result = await thicknessInWorker(baseGeometry, minNative);
+        if (analysisToken.current !== token) return;
+        setThicknessResult(result);
+        setShowThickness(true);
+        setShowMold(false);
+        setShowCut(false);
+        setMeasurePoints([]);
+      } catch {
+        /* leave state untouched on failure */
+      } finally {
+        if (analysisToken.current === token) setThicknessBusy(false);
+      }
+    },
+    [baseGeometry, unit, scale]
+  );
+
+  const handleCut = useCallback(
+    async (axis: SplitAxis, positionRatio: number) => {
+      if (!baseGeometry) return;
+      setIsCutting(true);
+      setCutError(null);
+      const token = analysisToken.current;
+      try {
+        baseGeometry.computeBoundingBox();
+        const box = baseGeometry.boundingBox!;
+        const axisIndex = { x: 0, y: 1, z: 2 }[axis] as 0 | 1 | 2;
+        const coord =
+          box.min.getComponent(axisIndex) +
+          (box.max.getComponent(axisIndex) - box.min.getComponent(axisIndex)) * positionRatio;
+        const result = await cutInWorker(baseGeometry, axis, coord);
+        if (analysisToken.current !== token) return;
+        setCutResult(result);
+        setShowCut(true);
+        setShowMold(false);
+        setMeasurePoints([]);
+      } catch (err) {
+        if (analysisToken.current === token) {
+          setCutError(err instanceof Error ? err.message : 'Kunne ikke kutte modellen.');
+        }
+      } finally {
+        if (analysisToken.current === token) setIsCutting(false);
+      }
+    },
+    [baseGeometry]
+  );
+
+  const handleDownloadCutHalf = useCallback(
+    (half: 'A' | 'B') => {
+      if (!cutResult || !stats) return;
+      const geometry = half === 'A' ? cutResult.halfA : cutResult.halfB;
+      const baseName = stats.fileName.replace(/\.[^.]+$/, '');
+      downloadGeometryAsSTL(geometry, scale, `${baseName}-del-${half}.stl`);
+    },
+    [cutResult, stats, scale]
+  );
+
+  const handleEngrave = useCallback(
+    async (
+      text: string,
+      face: FaceSide,
+      sizeInUnit: number,
+      depthInUnit: number,
+      mode: 'engrave' | 'emboss'
+    ) => {
+      if (!baseGeometry) return;
+      setIsEngraving(true);
+      setEngraveError(null);
+      const token = ++analysisToken.current;
+      try {
+        const toNative = (value: number) =>
+          (unit === 'in' ? value / MM_TO_INCH : value) / scale;
+        const result = await engraveInWorker(baseGeometry, {
+          text,
+          face,
+          size: toNative(sizeInUnit),
+          depth: toNative(depthInUnit),
+          mode,
+          upAxis: stats?.format === 'obj' || stats?.format === 'glb' ? 'y' : 'z',
+        });
+        if (analysisToken.current !== token) return;
+        setBaseGeometry(result);
+        const triangleCount = result.index
+          ? result.index.count / 3
+          : result.attributes.position.count / 3;
+        setStats((prev) =>
+          prev
+            ? {
+                ...prev,
+                triangleCount: Math.round(triangleCount),
+                vertexCount: result.attributes.position.count,
+              }
+            : prev
+        );
+        setHealth(null);
+        analyzeMeshInWorker(result)
+          .then((report) => {
+            if (analysisToken.current === token) setHealth(report);
+          })
+          .catch(() => {});
+        resetShellState();
+        setMoldResult(null);
+        setShowMold(false);
+        setCutResult(null);
+        setShowCut(false);
+        setMeasurePoints([]);
+      } catch (err) {
+        if (analysisToken.current === token) {
+          setEngraveError(err instanceof Error ? err.message : 'Graveringen feilet.');
+        }
+      } finally {
+        setIsEngraving(false);
+      }
+    },
+    [baseGeometry, unit, scale, stats, resetShellState]
+  );
+
+  const cutDisplayObject = useMemo(() => {
+    if (!cutResult || !baseGeometry) return null;
+    baseGeometry.computeBoundingBox();
+    const size = baseGeometry.boundingBox!.getSize(new THREE.Vector3());
+    const axisIndex = { x: 0, y: 1, z: 2 }[cutResult.axis] as 0 | 1 | 2;
+    const offset = new THREE.Vector3();
+    offset.setComponent(axisIndex, size.getComponent(axisIndex) * 0.12 + 1);
+
+    const materialA = new THREE.MeshStandardMaterial({
+      color: '#4f8ff7',
+      roughness: 0.35,
+      side: THREE.DoubleSide,
+    });
+    const materialB = new THREE.MeshStandardMaterial({
+      color: '#f59e0b',
+      roughness: 0.35,
+      side: THREE.DoubleSide,
+    });
+    const meshA = new THREE.Mesh(cutResult.halfA, materialA);
+    const meshB = new THREE.Mesh(cutResult.halfB, materialB);
+    meshA.position.copy(offset);
+    meshB.position.copy(offset).multiplyScalar(-1);
+
+    const group = new THREE.Group();
+    group.add(meshA, meshB);
+    if (stats?.format === 'stl' || stats?.format === 'ply') {
+      group.rotation.x = -Math.PI / 2;
+    }
+    return group;
+  }, [cutResult, baseGeometry, stats]);
+
   const moldDisplayObject = useMemo(() => {
     if (!moldResult) return null;
 
@@ -347,7 +597,7 @@ export default function Home() {
 
     const group = new THREE.Group();
     group.add(meshA, meshB);
-    if (stats?.format === 'stl') {
+    if (stats?.format === 'stl' || stats?.format === 'ply') {
       group.rotation.x = -Math.PI / 2;
     }
     return group;
@@ -355,7 +605,21 @@ export default function Home() {
 
   const displayObject = useMemo(() => {
     if (showMold && moldDisplayObject) return moldDisplayObject;
+    if (showCut && cutDisplayObject) return cutDisplayObject;
     if (!object || !singleMesh) return object;
+    if (showThickness && thicknessResult) {
+      const mesh = new THREE.Mesh(
+        thicknessResult.geometry,
+        new THREE.MeshStandardMaterial({
+          vertexColors: true,
+          roughness: 0.55,
+          metalness: 0.05,
+          side: THREE.DoubleSide,
+        })
+      );
+      mesh.rotation.copy(object.rotation);
+      return mesh;
+    }
     if (isHollow && shellGeometry) {
       const mesh = new THREE.Mesh(shellGeometry, singleMesh.material);
       mesh.rotation.copy(object.rotation);
@@ -367,7 +631,7 @@ export default function Home() {
       return mesh;
     }
     return object;
-  }, [showMold, moldDisplayObject, object, singleMesh, isHollow, shellGeometry, baseGeometry]);
+  }, [showMold, moldDisplayObject, showCut, cutDisplayObject, showThickness, thicknessResult, object, singleMesh, isHollow, shellGeometry, baseGeometry]);
 
   const distance =
     measurePoints.length === 2 ? measurePoints[0].distanceTo(measurePoints[1]) : null;
@@ -393,7 +657,7 @@ export default function Home() {
               <p className="text-[11px] text-slate-500">3D-verktøy for makere og modellbyggere</p>
             </div>
           </div>
-          <span className="tlabel rounded-full border border-slate-700 px-3 py-1">STL · OBJ</span>
+          <span className="tlabel rounded-full border border-slate-700 px-3 py-1">STL · OBJ · GLB · PLY</span>
         </div>
         <div className="h-px w-full bg-gradient-to-r from-amber-500/60 via-teal-400/40 to-transparent" />
       </header>
@@ -444,17 +708,30 @@ export default function Home() {
                   stats={stats}
                   scale={scale}
                   unit={unit}
+                  volumeNative={volumeNative}
                   onUnitChange={setUnit}
                   onScaleChange={handleScaleChange}
                   onDownload={handleDownload}
                   onReset={handleReset}
+                />
+                <TransformPanel
+                  supported={singleMesh !== null}
+                  onRotate={handleRotate}
+                  onMirror={handleMirror}
+                  onLayFlat={handleLayFlat}
                 />
                 <RepairPanel
                   supported={singleMesh !== null}
                   health={health}
                   isRepairing={isRepairing}
                   lastRepairCount={repairedCount}
+                  unit={unit}
+                  thicknessBusy={thicknessBusy}
+                  thicknessInfo={thicknessResult}
+                  showThickness={showThickness}
                   onRepair={handleRepair}
+                  onCheckThickness={handleCheckThickness}
+                  onToggleShowThickness={() => setShowThickness((prev) => !prev)}
                 />
                 <OptimizePanel
                   supported={singleMesh !== null}
@@ -497,6 +774,26 @@ export default function Home() {
                     setMeasurePoints([]);
                   }}
                   onDownloadHalf={handleDownloadMoldHalf}
+                />
+                <CutPanel
+                  supported={singleMesh !== null}
+                  isCutting={isCutting}
+                  error={cutError}
+                  hasResult={cutResult !== null}
+                  showCut={showCut}
+                  onCut={handleCut}
+                  onToggleShowCut={() => {
+                    setShowCut((prev) => !prev);
+                    setMeasurePoints([]);
+                  }}
+                  onDownloadHalf={handleDownloadCutHalf}
+                />
+                <EngravePanel
+                  supported={singleMesh !== null}
+                  unit={unit}
+                  isEngraving={isEngraving}
+                  error={engraveError}
+                  onEngrave={handleEngrave}
                 />
               </aside>
             </>

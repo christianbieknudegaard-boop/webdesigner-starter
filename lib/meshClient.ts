@@ -53,16 +53,47 @@ export async function analyzeMeshInWorker(
   return response.report;
 }
 
+export interface ThicknessClientResult {
+  /** Geometry with a vertex-color heat map (red = below threshold). */
+  geometry: THREE.BufferGeometry;
+  belowFraction: number;
+  minFound: number;
+}
+
+/** Runs the BVH wall-thickness analysis in the worker. `minThickness` is in
+ *  native model units. */
+export async function thicknessInWorker(
+  geometry: THREE.BufferGeometry,
+  minThickness: number
+): Promise<ThicknessClientResult> {
+  const { positions, index } = extract(geometry);
+  const response = await runMeshWorker({ op: 'thickness', positions, index, amount: minThickness });
+  if (response.op !== 'thickness') throw new Error('Uventet svar fra tykkelsesanalysen.');
+
+  const rebuilt = new THREE.BufferGeometry();
+  rebuilt.setAttribute('position', new THREE.BufferAttribute(response.positions, 3));
+  if (response.index) rebuilt.setIndex(new THREE.BufferAttribute(response.index, 1));
+  rebuilt.setAttribute('color', new THREE.BufferAttribute(response.colors, 3));
+  rebuilt.computeVertexNormals();
+
+  return {
+    geometry: rebuilt,
+    belowFraction: response.belowFraction,
+    minFound: response.minFound,
+  };
+}
+
 /** Runs a geometry-transforming op (repair/simplify/loose/smooth) in the
  *  worker and rebuilds the resulting geometry with fresh normals. */
 export async function runGeometryOp(
   geometry: THREE.BufferGeometry,
-  op: Exclude<MeshWorkerOp, 'analyze'>,
+  op: Exclude<MeshWorkerOp, 'analyze' | 'thickness'>,
   amount?: number
 ): Promise<GeometryOpResult> {
   const { positions, index } = extract(geometry);
   const response = await runMeshWorker({ op, positions, index, amount });
-  if (response.op === 'analyze') throw new Error('Uventet svar fra meshoperasjonen.');
+  if (response.op === 'analyze' || response.op === 'thickness')
+    throw new Error('Uventet svar fra meshoperasjonen.');
 
   const rebuilt = new THREE.BufferGeometry();
   rebuilt.setAttribute('position', new THREE.BufferAttribute(response.positions, 3));

@@ -5,7 +5,13 @@ verktøy som [MoldBoxer](https://moldboxer.com/) og [Meshcast](https://meshcast.
 
 ## 🚀 Funksjoner
 
-- **3D-viewer**: Dra-og-slipp STL/OBJ-filer og se dem i en flott, interaktiv 3D-scene
+- **3D-viewer**: Dra-og-slipp STL-, OBJ-, GLB/GLTF- og PLY-filer (GLB er formatet de fleste AI bilde-til-3D-tjenester leverer)
+- **Orientering**: Rotér 90°, speil, og legg største flate ned
+- **Volum og vekt**: Volum i cm³ med vektestimat per materiale (PLA/PETG/ABS/resin/silikon/gips)
+- **Optimalisering**: Forenkle tunge AI-modeller (meshoptimizer), fjern løse fragmenter, glatt ut overflater
+- **Plan-kutt**: Del modellen i to vanntette deler for utskrift i biter
+- **Gravering**: Gravér eller preg tekst på valgfri flate
+- **Veggtykkelse**: BVH-basert analyse med fargekart over for tynne områder
 - **Modellinfo**: Dimensjoner, triangel- og punktantall, med mm/tommer-veksling
 - **Måling og skalering**: Klikk to punkter for å måle avstand; skriv inn ønsket mål så skaleres modellen proporsjonalt
 - **Mesh-reparasjon**: Finner og tetter hull automatisk, varsler om ikke-manifold kanter

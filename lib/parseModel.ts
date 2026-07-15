@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { ensureOutwardWinding } from '@/lib/meshUtils';
 import type { ModelFormat, ModelStats } from '@/types/model';
@@ -120,8 +122,34 @@ export async function parseModelFile(file: File): Promise<ParsedModel> {
     } catch {
       throw new Error('Kunne ikke lese OBJ-filen. Den kan være skadet eller ha feil format.');
     }
+  } else if (extension === 'glb' || extension === 'gltf') {
+    try {
+      const buffer = await file.arrayBuffer();
+      const gltf = await new GLTFLoader().parseAsync(buffer, '');
+      object = gltf.scene;
+      format = 'glb';
+    } catch {
+      throw new Error(
+        'Kunne ikke lese GLB/GLTF-filen. Draco-komprimerte filer støttes ikke ennå.'
+      );
+    }
+  } else if (extension === 'ply') {
+    try {
+      const buffer = await file.arrayBuffer();
+      const geometry = new PLYLoader().parse(buffer);
+      if (!geometry.index && geometry.attributes.position.count % 3 !== 0) {
+        throw new Error('punktsky');
+      }
+      geometry.computeVertexNormals();
+      object = new THREE.Mesh(geometry);
+      format = 'ply';
+    } catch {
+      throw new Error('Kunne ikke lese PLY-filen. Punktskyer uten flater støttes ikke.');
+    }
   } else {
-    throw new Error(`Filformatet .${extension ?? '?'} støttes ikke ennå. Bruk STL eller OBJ.`);
+    throw new Error(
+      `Filformatet .${extension ?? '?'} støttes ikke ennå. Bruk STL, OBJ, GLB eller PLY.`
+    );
   }
 
   assertHasMesh(object);
@@ -135,9 +163,10 @@ export async function parseModelFile(file: File): Promise<ParsedModel> {
   // so dimensions match what a slicer/CAD tool would report (X/Y/Z as authored).
   const stats = computeStats(object, file.name, format);
 
-  // STL is conventionally Z-up (print bed = XY, height = Z), while three.js
-  // treats Y as up. Rotate for display only so tall parts don't render lying down.
-  if (format === 'stl') {
+  // STL and PLY are conventionally Z-up (print bed = XY, height = Z), while
+  // three.js treats Y as up. Rotate for display only so tall parts don't
+  // render lying down. OBJ and GLB are already Y-up.
+  if (format === 'stl' || format === 'ply') {
     object.rotation.x = -Math.PI / 2;
   }
 

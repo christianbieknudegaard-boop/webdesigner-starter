@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 
-const ACCEPTED_EXTENSIONS = ['.stl', '.obj'];
+const ACCEPTED_EXTENSIONS = ['.stl', '.obj', '.glb', '.gltf', '.ply'];
 
 interface UploadZoneProps {
   onFile: (file: File) => void;
@@ -51,13 +51,13 @@ export default function UploadZone({ onFile, isLoading, error }: UploadZoneProps
         <input
           ref={inputRef}
           type="file"
-          accept=".stl,.obj"
+          accept=".stl,.obj,.glb,.gltf,.ply"
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}
         />
         <div className="text-4xl">📦</div>
         <p className="text-lg font-medium text-slate-100">
-          {isLoading ? 'Leser modell…' : 'Slipp en STL- eller OBJ-fil her'}
+          {isLoading ? 'Leser modell…' : 'Slipp en 3D-fil her (STL, OBJ, GLB, PLY)'}
         </p>
         <p className="text-sm text-slate-400">eller klikk for å velge en fil fra maskinen din</p>
         {error && <p className="text-sm text-red-400">{error}</p>}

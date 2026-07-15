@@ -51,6 +51,7 @@ export default function MoldPanel({
   const [registrationKeys, setRegistrationKeys] = useState(true);
   const [bandGrooves, setBandGrooves] = useState(true);
   const [prySlots, setPrySlots] = useState(true);
+  const [markHalves, setMarkHalves] = useState(true);
 
   // Follow the recommendation whenever a new model produces one
   // (state adjusted during render, per React's "you might not need an effect").
@@ -75,7 +76,7 @@ export default function MoldPanel({
   return (
     <details className="tcard w-full p-4">
       <summary className="tlabel cursor-pointer list-none select-none [&::-webkit-details-marker]:hidden">
-        <span className="tnum">05</span>Mold-generator
+        <span className="tnum">06</span>Mold-generator
       </summary>
 
       {!supported ? (
@@ -170,11 +171,25 @@ export default function MoldPanel({
               />
               Vippespor (åpning)
             </label>
+            <label className="flex items-center gap-2 text-slate-400">
+              <input
+                type="checkbox"
+                checked={markHalves}
+                onChange={() => setMarkHalves((prev) => !prev)}
+              />
+              Merk halvdelene (A/B)
+            </label>
           </div>
 
           <button
             onClick={() =>
-              onGenerate(margin, axis, { pourChannel, registrationKeys, bandGrooves, prySlots })
+              onGenerate(margin, axis, {
+                pourChannel,
+                registrationKeys,
+                bandGrooves,
+                prySlots,
+                markHalves,
+              })
             }
             disabled={isGenerating || !(margin > 0)}
             className="mt-3 w-full rounded-md border border-slate-600 py-1.5 text-xs text-slate-200 hover:border-slate-400 disabled:opacity-50"

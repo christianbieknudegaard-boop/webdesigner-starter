@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Brush, Evaluator, SUBTRACTION, INTERSECTION, ADDITION, computeMeshVolume } from 'three-bvh-csg';
+import { buildTextGeometry, textRotationFor } from '@/lib/csgTools';
 
 export type SplitAxis = 'x' | 'y' | 'z';
 
@@ -8,6 +9,8 @@ export interface MoldOptions {
   registrationKeys: boolean;
   bandGrooves: boolean;
   prySlots: boolean;
+  /** Engrave "A"/"B" on the outer face of each half. */
+  markHalves: boolean;
   /** The model's up direction in native coordinates: 'z' for STL, 'y' for OBJ. */
   upAxis: SplitAxis;
 }
@@ -149,6 +152,7 @@ export function generateMold(
     registrationKeys: true,
     bandGrooves: true,
     prySlots: true,
+    markHalves: true,
     upAxis: 'z',
   }
 ): MoldResult {
@@ -339,6 +343,38 @@ export function generateMold(
         halfABrush = evaluator.evaluate(halfABrush, recessBrush, SUBTRACTION);
       }
     }
+  }
+
+  if (options.markHalves) {
+    // Engrave "A"/"B" on each half's outer face (opposite the parting plane)
+    // so printed halves can't be mixed up - standard mold-making practice.
+    const [axisU, axisV] = ALL_AXES.filter((axis) => axis !== splitAxis);
+    const letterSize = Math.min(
+      Math.min(outerSize.getComponent(AXIS_INDEX[axisU]), outerSize.getComponent(AXIS_INDEX[axisV])) * 0.22,
+      margin * 3
+    );
+    const letterDepth = margin * 0.15;
+    const upDirection = new THREE.Vector3();
+    upDirection.setComponent(AXIS_INDEX[options.upAxis ?? 'z'], 1);
+
+    const engraveLetter = (brush: Brush, letter: string, side: 1 | -1): Brush => {
+      const direction = new THREE.Vector3();
+      direction.setComponent(AXIS_INDEX[splitAxis], side);
+      const textBrush = new Brush(buildTextGeometry(letter, letterSize, letterDepth * 2));
+      textBrush.quaternion.copy(textRotationFor(direction, upDirection));
+      const position = center.clone();
+      position.setComponent(
+        AXIS_INDEX[splitAxis],
+        center.getComponent(AXIS_INDEX[splitAxis]) +
+          side * (outerSize.getComponent(AXIS_INDEX[splitAxis]) / 2 - letterDepth)
+      );
+      textBrush.position.copy(position);
+      textBrush.updateMatrixWorld();
+      return evaluator.evaluate(brush, textBrush, SUBTRACTION);
+    };
+
+    halfABrush = engraveLetter(halfABrush, 'A', 1);
+    halfBBrush = engraveLetter(halfBBrush, 'B', -1);
   }
 
   // The evaluator emits result geometry in the FIRST brush's local frame and

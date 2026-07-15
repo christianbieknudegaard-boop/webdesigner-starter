@@ -49,7 +49,7 @@ export default function ShellPanel({
   return (
     <details className="tcard w-full p-4">
       <summary className="tlabel cursor-pointer list-none select-none [&::-webkit-details-marker]:hidden">
-        <span className="tnum">04</span>Hul-gjøring
+        <span className="tnum">05</span>Hul-gjøring
       </summary>
 
       {!supported ? (

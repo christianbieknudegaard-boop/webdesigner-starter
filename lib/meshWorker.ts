@@ -2,8 +2,9 @@
 import * as THREE from 'three';
 import { analyzeMesh, repairMesh, type MeshHealthReport } from '@/lib/meshRepair';
 import { simplifyGeometry, removeLooseParts, smoothGeometry } from '@/lib/meshOptimize';
+import { analyzeThickness } from '@/lib/thickness';
 
-export type MeshWorkerOp = 'analyze' | 'repair' | 'simplify' | 'loose' | 'smooth';
+export type MeshWorkerOp = 'analyze' | 'repair' | 'simplify' | 'loose' | 'smooth' | 'thickness';
 
 export interface MeshWorkerRequest {
   op: MeshWorkerOp;
@@ -17,7 +18,16 @@ export type MeshWorkerResponse =
   | { ok: true; op: 'analyze'; report: MeshHealthReport }
   | {
       ok: true;
-      op: Exclude<MeshWorkerOp, 'analyze'>;
+      op: 'thickness';
+      positions: Float32Array;
+      index: Uint32Array | null;
+      colors: Float32Array;
+      belowFraction: number;
+      minFound: number;
+    }
+  | {
+      ok: true;
+      op: Exclude<MeshWorkerOp, 'analyze' | 'thickness'>;
       report: MeshHealthReport;
       positions: Float32Array;
       index: Uint32Array | null;
@@ -35,7 +45,7 @@ function buildGeometry(positions: Float32Array, index: Uint32Array | null): THRE
 }
 
 function respondWithGeometry(
-  op: Exclude<MeshWorkerOp, 'analyze'>,
+  op: Exclude<MeshWorkerOp, 'analyze' | 'thickness'>,
   geometry: THREE.BufferGeometry,
   detail: number
 ) {
@@ -72,6 +82,31 @@ self.onmessage = async (event: MessageEvent<MeshWorkerRequest>) => {
     if (op === 'repair') {
       const result = repairMesh(geometry);
       respondWithGeometry(op, result.geometry, result.holesFilled);
+      return;
+    }
+
+    if (op === 'thickness') {
+      const result = analyzeThickness(geometry, amount ?? 2);
+      const outPositions = new Float32Array(result.geometry.attributes.position.array);
+      const outIndex = result.geometry.index
+        ? new Uint32Array(result.geometry.index.array)
+        : null;
+      const colors = new Float32Array(result.geometry.attributes.color.array);
+      const response: MeshWorkerResponse = {
+        ok: true,
+        op,
+        positions: outPositions,
+        index: outIndex,
+        colors,
+        belowFraction: result.belowFraction,
+        minFound: result.minFound,
+      };
+      const transfer: ArrayBuffer[] = [
+        outPositions.buffer as ArrayBuffer,
+        colors.buffer as ArrayBuffer,
+      ];
+      if (outIndex) transfer.push(outIndex.buffer as ArrayBuffer);
+      self.postMessage(response, { transfer });
       return;
     }
 

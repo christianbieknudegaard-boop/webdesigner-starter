@@ -1,4 +1,4 @@
-export type ModelFormat = 'stl' | 'obj';
+export type ModelFormat = 'stl' | 'obj' | 'glb' | 'ply';
 
 export interface ModelStats {
   fileName: string;

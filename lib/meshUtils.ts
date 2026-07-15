@@ -10,6 +10,51 @@ export function getSingleMesh(object: THREE.Object3D): THREE.Mesh | null {
   return meshes.length === 1 ? meshes[0] : null;
 }
 
+/** Enclosed volume of a closed mesh in native units cubed (positive when
+ *  wound outward). */
+export function computeVolume(geometry: THREE.BufferGeometry): number {
+  return Math.abs(signedVolume(geometry));
+}
+
+/**
+ * Area-weighted dominant face normal, for "lay flat": buckets normals on a
+ * coarse grid and returns the average normal of the largest planar cluster.
+ */
+export function dominantFaceNormal(geometry: THREE.BufferGeometry): THREE.Vector3 | null {
+  const position = geometry.attributes.position;
+  const index = geometry.index;
+  const count = index ? index.count : position.count;
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const c = new THREE.Vector3();
+  const n = new THREE.Vector3();
+
+  const buckets = new Map<string, { sum: THREE.Vector3; area: number }>();
+  for (let i = 0; i < count; i += 3) {
+    a.fromBufferAttribute(position, index ? index.getX(i) : i);
+    b.fromBufferAttribute(position, index ? index.getX(i + 1) : i + 1);
+    c.fromBufferAttribute(position, index ? index.getX(i + 2) : i + 2);
+    n.subVectors(b, a).cross(c.clone().sub(a));
+    const doubleArea = n.length();
+    if (doubleArea < 1e-12) continue;
+    n.divideScalar(doubleArea);
+    const key = `${Math.round(n.x * 10)}_${Math.round(n.y * 10)}_${Math.round(n.z * 10)}`;
+    const bucket = buckets.get(key);
+    if (bucket) {
+      bucket.sum.addScaledVector(n, doubleArea);
+      bucket.area += doubleArea;
+    } else {
+      buckets.set(key, { sum: n.clone().multiplyScalar(doubleArea), area: doubleArea });
+    }
+  }
+
+  let best: { sum: THREE.Vector3; area: number } | null = null;
+  for (const bucket of buckets.values()) {
+    if (!best || bucket.area > best.area) best = bucket;
+  }
+  return best ? best.sum.normalize() : null;
+}
+
 function signedVolume(geometry: THREE.BufferGeometry): number {
   const position = geometry.attributes.position;
   const index = geometry.index;

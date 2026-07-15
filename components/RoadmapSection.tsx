@@ -26,7 +26,25 @@ const TOOLS = [
   {
     icon: '🧊',
     title: 'Mold-generator',
-    description: 'Last opp en modell og få en automatisk splittet, 3D-printbar støpeform generert rundt den.',
+    description: 'Automatisk todelt støpeform med hellekanal, styrelåser, strikk-spor og A/B-merking.',
+    status: 'Klart',
+  },
+  {
+    icon: '🔪',
+    title: 'Plan-kutt',
+    description: 'Del modellen i to langs et plan for å printe store modeller i deler.',
+    status: 'Klart',
+  },
+  {
+    icon: '🔤',
+    title: 'Gravering',
+    description: 'Gravér eller preg tekst på modellen – navn, delenummer eller merking.',
+    status: 'Klart',
+  },
+  {
+    icon: '📏',
+    title: 'Veggtykkelse',
+    description: 'Fargekart som avslører områder som er for tynne for print eller støp.',
     status: 'Klart',
   },
 ] as const;
