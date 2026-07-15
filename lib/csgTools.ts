@@ -35,14 +35,106 @@ export interface CutResult {
   halfA: THREE.BufferGeometry;
   halfB: THREE.BufferGeometry;
   axis: SplitAxis;
+  pinsAdded: boolean;
+}
+
+/**
+ * Finds up to two dowel-pin positions on the flat cap that `cutGeometry`
+ * produced: collects the cap triangles (coplanar with the cut), then walks
+ * candidates along the cap's longer in-plane dimension and keeps those that
+ * actually land on cap material (point-in-triangle test in 2D).
+ */
+function findPinSpots(
+  capGeometry: THREE.BufferGeometry,
+  axisIndex: 0 | 1 | 2,
+  coord: number
+): { points: THREE.Vector3[]; radius: number } {
+  const position = capGeometry.attributes.position;
+  const index = capGeometry.index;
+  const count = index ? index.count : position.count;
+  const [u, v] = [0, 1, 2].filter((i) => i !== axisIndex) as [number, number];
+  const epsilon = 1e-3;
+
+  interface CapTri { au: number; av: number; bu: number; bv: number; cu: number; cv: number }
+  const capTris: CapTri[] = [];
+  const p = new THREE.Vector3();
+  let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
+
+  const corners: THREE.Vector3[] = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+  for (let i = 0; i < count; i += 3) {
+    let onPlane = true;
+    for (let k = 0; k < 3; k++) {
+      corners[k].fromBufferAttribute(position, index ? index.getX(i + k) : i + k);
+      if (Math.abs(corners[k].getComponent(axisIndex) - coord) > epsilon) onPlane = false;
+    }
+    if (!onPlane) continue;
+    capTris.push({
+      au: corners[0].getComponent(u), av: corners[0].getComponent(v),
+      bu: corners[1].getComponent(u), bv: corners[1].getComponent(v),
+      cu: corners[2].getComponent(u), cv: corners[2].getComponent(v),
+    });
+    for (const corner of corners) {
+      minU = Math.min(minU, corner.getComponent(u));
+      maxU = Math.max(maxU, corner.getComponent(u));
+      minV = Math.min(minV, corner.getComponent(v));
+      maxV = Math.max(maxV, corner.getComponent(v));
+    }
+  }
+  if (capTris.length === 0) return { points: [], radius: 0 };
+
+  const spanU = maxU - minU;
+  const spanV = maxV - minV;
+  const radius = Math.min(Math.min(spanU, spanV) * 0.12, 4);
+  if (radius < 0.5) return { points: [], radius: 0 };
+
+  const inCap = (pu: number, pv: number): boolean => {
+    for (const t of capTris) {
+      const d1 = (pu - t.bu) * (t.av - t.bv) - (t.au - t.bu) * (pv - t.bv);
+      const d2 = (pu - t.cu) * (t.bv - t.cv) - (t.bu - t.cu) * (pv - t.cv);
+      const d3 = (pu - t.au) * (t.cv - t.av) - (t.cu - t.au) * (pv - t.av);
+      const hasNeg = d1 < 0 || d2 < 0 || d3 < 0;
+      const hasPos = d1 > 0 || d2 > 0 || d3 > 0;
+      if (!(hasNeg && hasPos)) return true;
+    }
+    return false;
+  };
+
+  // Candidates spread along the longer in-plane dimension, centered on the
+  // shorter one; require clearance for the pin plus a small wall.
+  const longIsU = spanU >= spanV;
+  const centerShort = longIsU ? (minV + maxV) / 2 : (minU + maxU) / 2;
+  const points: THREE.Vector3[] = [];
+  for (const fraction of [0.28, 0.72, 0.5, 0.15, 0.85]) {
+    if (points.length >= 2) break;
+    const long = (longIsU ? minU : minV) + (longIsU ? spanU : spanV) * fraction;
+    const pu = longIsU ? long : centerShort;
+    const pv = longIsU ? centerShort : long;
+    const clear = radius * 1.6;
+    if (
+      inCap(pu, pv) &&
+      inCap(pu + clear, pv) && inCap(pu - clear, pv) &&
+      inCap(pu, pv + clear) && inCap(pu, pv - clear) &&
+      points.every((q) => Math.hypot(q.getComponent(u) - pu, q.getComponent(v) - pv) > radius * 4)
+    ) {
+      p.set(0, 0, 0);
+      p.setComponent(axisIndex, coord);
+      p.setComponent(u, pu);
+      p.setComponent(v, pv);
+      points.push(p.clone());
+    }
+  }
+  return { points, radius };
 }
 
 /** Cuts the model in two along a plane perpendicular to `axis` at `coord`
- *  (native units), producing two watertight, printable halves. */
+ *  (native units), producing two watertight, printable halves. With `pins`,
+ *  dowel bumps on half A and clearance recesses on half B self-align the
+ *  parts when gluing. */
 export function cutGeometry(
   sourceGeometry: THREE.BufferGeometry,
   axis: SplitAxis,
-  coord: number
+  coord: number,
+  pins = true
 ): CutResult {
   const geometry = sourceGeometry.clone();
   geometry.computeBoundingBox();
@@ -78,7 +170,33 @@ export function cutGeometry(
     throw new Error('Kutteplanet treffer ikke modellen. Juster posisjonen.');
   }
 
-  return { halfA: halves[0], halfB: halves[1], axis };
+  let [halfA, halfB] = halves;
+  let pinsAdded = false;
+
+  if (pins) {
+    const spots = findPinSpots(halfA, axisIndex, coord);
+    if (spots.points.length > 0) {
+      let brushA = new Brush(halfA);
+      brushA.updateMatrixWorld();
+      let brushB = new Brush(halfB);
+      brushB.updateMatrixWorld();
+      for (const point of spots.points) {
+        const bump = new Brush(new THREE.SphereGeometry(spots.radius, 16, 16));
+        bump.position.copy(point);
+        bump.updateMatrixWorld();
+        const recess = new Brush(new THREE.SphereGeometry(spots.radius * 1.12, 16, 16));
+        recess.position.copy(point);
+        recess.updateMatrixWorld();
+        brushA = evaluator.evaluate(brushA, bump, ADDITION);
+        brushB = evaluator.evaluate(brushB, recess, SUBTRACTION);
+      }
+      halfA = bakeResult(brushA);
+      halfB = bakeResult(brushB);
+      pinsAdded = true;
+    }
+  }
+
+  return { halfA, halfB, axis, pinsAdded };
 }
 
 /** Builds a centered, extruded text geometry lying in the XY plane facing +Z. */

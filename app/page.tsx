@@ -33,7 +33,7 @@ import CutPanel from '@/components/CutPanel';
 import EngravePanel from '@/components/EngravePanel';
 import type { FaceSide } from '@/lib/csgTools';
 import { analyzeDemoldability, recommendSplitAxis } from '@/lib/demoldAnalysis';
-import { downloadGeometryAsSTL } from '@/lib/exportModel';
+import { downloadGeometryAsSTL, downloadGeometry } from '@/lib/exportModel';
 import { getSingleMesh, computeVolume, dominantFaceNormal, ensureOutwardWinding } from '@/lib/meshUtils';
 import TransformPanel, { type RotateAxis } from '@/components/TransformPanel';
 import type { ModelStats } from '@/types/model';
@@ -76,6 +76,23 @@ export default function Home() {
 
   // Guards async worker results against arriving after the model changed.
   const analysisToken = useRef(0);
+
+  // Single-step undo: snapshot before each destructive geometry change.
+  // Undoing swaps snapshot and current, so a second undo acts as redo.
+  const undoSnapshot = useRef<{
+    geometry: THREE.BufferGeometry;
+    stats: ModelStats;
+    health: MeshHealthReport | null;
+  } | null>(null);
+  const [canUndo, setCanUndo] = useState(false);
+  const rememberForUndo = useCallback(
+    (geometry: THREE.BufferGeometry | null, statsValue: ModelStats | null, healthValue: MeshHealthReport | null) => {
+      if (!geometry || !statsValue) return;
+      undoSnapshot.current = { geometry, stats: statsValue, health: healthValue };
+      setCanUndo(true);
+    },
+    []
+  );
 
   const [thicknessResult, setThicknessResult] = useState<ThicknessClientResult | null>(null);
   const [thicknessBusy, setThicknessBusy] = useState(false);
@@ -130,6 +147,8 @@ export default function Home() {
         resetMoldState();
         setRepairedCount(null);
         setOptimizeStatus(null);
+        undoSnapshot.current = null;
+        setCanUndo(false);
 
         const mesh = getSingleMesh(result.object);
         setBaseGeometry(mesh?.geometry ?? null);
@@ -168,6 +187,8 @@ export default function Home() {
     setHealth(null);
     setRepairedCount(null);
     setOptimizeStatus(null);
+    undoSnapshot.current = null;
+    setCanUndo(false);
   }, [resetShellState, resetMoldState]);
 
   const handleScaleChange = useCallback(
@@ -215,6 +236,7 @@ export default function Home() {
     (mutate: (geometry: THREE.BufferGeometry) => void) => {
       if (!baseGeometry) return;
       analysisToken.current++; // discard in-flight results for the old orientation
+      rememberForUndo(baseGeometry, stats, health);
       const next = baseGeometry.clone();
       mutate(next);
       next.computeVertexNormals();
@@ -228,7 +250,7 @@ export default function Home() {
       resetMoldState();
       setMeasurePoints([]);
     },
-    [baseGeometry, resetShellState, resetMoldState]
+    [baseGeometry, stats, health, rememberForUndo, resetShellState, resetMoldState]
   );
 
   const handleRotate = useCallback(
@@ -270,6 +292,7 @@ export default function Home() {
       const token = ++analysisToken.current;
       const result = await runGeometryOp(baseGeometry, op, amount);
       if (analysisToken.current !== token) return null; // model changed meanwhile
+      rememberForUndo(baseGeometry, stats, health);
       setBaseGeometry(result.geometry);
       setHealth(result.report);
       setStats((prev) =>
@@ -286,7 +309,7 @@ export default function Home() {
       setMeasurePoints([]);
       return result;
     },
-    [baseGeometry, resetShellState, resetMoldState]
+    [baseGeometry, stats, health, rememberForUndo, resetShellState, resetMoldState]
   );
 
   const handleRepair = useCallback(async () => {
@@ -361,12 +384,30 @@ export default function Home() {
     [baseGeometry, unit, scale]
   );
 
-  const handleDownload = useCallback(() => {
-    if (!baseGeometry || !stats) return;
-    const geometry = isHollow && shellGeometry ? shellGeometry : baseGeometry;
-    const baseName = stats.fileName.replace(/\.[^.]+$/, '');
-    downloadGeometryAsSTL(geometry, scale, `${baseName}-meshforge.stl`);
-  }, [baseGeometry, stats, isHollow, shellGeometry, scale]);
+  const handleDownload = useCallback(
+    (format: 'stl' | 'obj' | 'ply' = 'stl') => {
+      if (!baseGeometry || !stats) return;
+      const geometry = isHollow && shellGeometry ? shellGeometry : baseGeometry;
+      const baseName = stats.fileName.replace(/\.[^.]+$/, '');
+      downloadGeometry(geometry, scale, `${baseName}-meshforge`, format);
+    },
+    [baseGeometry, stats, isHollow, shellGeometry, scale]
+  );
+
+  const handleUndo = useCallback(() => {
+    const snapshot = undoSnapshot.current;
+    if (!snapshot || !baseGeometry || !stats) return;
+    analysisToken.current++;
+    undoSnapshot.current = { geometry: baseGeometry, stats, health };
+    setBaseGeometry(snapshot.geometry);
+    setStats(snapshot.stats);
+    setHealth(snapshot.health);
+    resetShellState();
+    resetMoldState();
+    setMeasurePoints([]);
+    setRepairedCount(null);
+    setOptimizeStatus(null);
+  }, [baseGeometry, stats, health, resetShellState, resetMoldState]);
 
   const handleGenerateMold = useCallback(
     async (
@@ -439,7 +480,7 @@ export default function Home() {
   );
 
   const handleCut = useCallback(
-    async (axis: SplitAxis, positionRatio: number) => {
+    async (axis: SplitAxis, positionRatio: number, pins: boolean) => {
       if (!baseGeometry) return;
       setIsCutting(true);
       setCutError(null);
@@ -451,7 +492,7 @@ export default function Home() {
         const coord =
           box.min.getComponent(axisIndex) +
           (box.max.getComponent(axisIndex) - box.min.getComponent(axisIndex)) * positionRatio;
-        const result = await cutInWorker(baseGeometry, axis, coord);
+        const result = await cutInWorker(baseGeometry, axis, coord, pins);
         if (analysisToken.current !== token) return;
         setCutResult(result);
         setShowCut(true);
@@ -502,6 +543,7 @@ export default function Home() {
           upAxis: stats?.format === 'obj' || stats?.format === 'glb' ? 'y' : 'z',
         });
         if (analysisToken.current !== token) return;
+        rememberForUndo(baseGeometry, stats, health);
         setBaseGeometry(result);
         const triangleCount = result.index
           ? result.index.count / 3
@@ -535,7 +577,7 @@ export default function Home() {
         setIsEngraving(false);
       }
     },
-    [baseGeometry, unit, scale, stats, resetShellState]
+    [baseGeometry, unit, scale, stats, health, rememberForUndo, resetShellState]
   );
 
   const cutDisplayObject = useMemo(() => {
@@ -712,6 +754,8 @@ export default function Home() {
                   onUnitChange={setUnit}
                   onScaleChange={handleScaleChange}
                   onDownload={handleDownload}
+                  canUndo={canUndo}
+                  onUndo={handleUndo}
                   onReset={handleReset}
                 />
                 <TransformPanel

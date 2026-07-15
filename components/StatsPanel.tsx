@@ -27,7 +27,9 @@ interface StatsPanelProps {
   volumeNative: number | null;
   onUnitChange: (unit: Unit) => void;
   onScaleChange: (scale: number) => void;
-  onDownload: () => void;
+  onDownload: (format: 'stl' | 'obj' | 'ply') => void;
+  canUndo: boolean;
+  onUndo: () => void;
   onReset: () => void;
 }
 
@@ -39,8 +41,11 @@ export default function StatsPanel({
   onUnitChange,
   onScaleChange,
   onDownload,
+  canUndo,
+  onUndo,
   onReset,
 }: StatsPanelProps) {
+  const [exportFormat, setExportFormat] = useState<'stl' | 'obj' | 'ply'>('stl');
   const factor = unit === 'mm' ? 1 : MM_TO_INCH;
   const [materialKey, setMaterialKey] = useState<string>('pla');
   const material = MATERIALS.find((m) => m.key === materialKey) ?? MATERIALS[0];
@@ -145,11 +150,30 @@ export default function StatsPanel({
       )}
 
       <div className="mt-4 space-y-2">
+        <div className="flex gap-2">
+          <select
+            value={exportFormat}
+            onChange={(e) => setExportFormat(e.target.value as 'stl' | 'obj' | 'ply')}
+            className="rounded-md border border-slate-700 bg-slate-800/80 px-2 py-1 text-xs text-slate-100"
+            aria-label="Eksportformat"
+          >
+            <option value="stl">STL</option>
+            <option value="obj">OBJ</option>
+            <option value="ply">PLY</option>
+          </select>
+          <button
+            onClick={() => onDownload(exportFormat)}
+            className="flex-1 rounded-md border border-blue-500/60 bg-blue-500/10 py-1.5 text-xs text-blue-100 hover:border-blue-400"
+          >
+            Last ned
+          </button>
+        </div>
         <button
-          onClick={onDownload}
-          className="w-full rounded-md border border-blue-500/60 bg-blue-500/10 py-1.5 text-xs text-blue-100 hover:border-blue-400"
+          onClick={onUndo}
+          disabled={!canUndo}
+          className="w-full rounded-md border border-slate-600 py-1.5 text-xs text-slate-300 hover:border-slate-400 disabled:opacity-40"
         >
-          Last ned STL
+          ↩ Angre siste endring
         </button>
         <button
           onClick={onReset}

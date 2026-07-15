@@ -78,10 +78,11 @@ export async function generateMoldInWorker(
 export async function cutInWorker(
   geometry: THREE.BufferGeometry,
   axis: SplitAxis,
-  coord: number
+  coord: number,
+  pins: boolean
 ): Promise<CutClientResult> {
   const { positions, index } = extract(geometry);
-  const response = await runCsgWorker({ kind: 'cut', positions, index, axis, coord });
+  const response = await runCsgWorker({ kind: 'cut', positions, index, axis, coord, pins });
   if (response.kind !== 'cut') throw new Error('Uventet svar fra CSG-workeren.');
   return {
     halfA: rebuildGeometry(response.halfA),

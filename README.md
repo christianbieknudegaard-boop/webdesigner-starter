@@ -38,4 +38,18 @@ npm run dev
 
 ## Deploy
 
-Prosjektet er satt opp for enkel deployment til [Vercel](https://vercel.com/new).
+Appen bygges som en ren statisk eksport (`npm run build` gir en `out/`-mappe) og kan hostes hvor som helst.
+
+### GitHub Pages (automatisk)
+
+Repoet har en workflow (`.github/workflows/deploy.yml`) som bygger og publiserer til GitHub Pages ved hver push. Første gang kan det hende du må aktivere Pages manuelt: gå til **Settings → Pages** i repoet og sett **Source** til **"GitHub Actions"** (workflowen forsøker å aktivere dette selv, men det krever riktige tillatelser).
+
+Siden blir tilgjengelig på:
+
+```
+https://<brukernavn>.github.io/<repo-navn>/
+```
+
+### Andre alternativer
+
+Statisk eksport betyr at [Vercel](https://vercel.com/new), Netlify, Cloudflare Pages eller en hvilken som helst filserver også fungerer uten ekstra oppsett.

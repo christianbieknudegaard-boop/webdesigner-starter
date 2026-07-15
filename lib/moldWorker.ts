@@ -18,6 +18,7 @@ export type MoldWorkerRequest =
       index: Uint32Array | null;
       axis: SplitAxis;
       coord: number;
+      pins: boolean;
     }
   | {
       kind: 'engrave';
@@ -92,7 +93,7 @@ self.onmessage = (event: MessageEvent<MoldWorkerRequest>) => {
     }
 
     if (request.kind === 'cut') {
-      const result = cutGeometry(geometry, request.axis, request.coord);
+      const result = cutGeometry(geometry, request.axis, request.coord, request.pins);
       const halfA = extract(result.halfA);
       const halfB = extract(result.halfB);
       const response: MoldWorkerResponse = {

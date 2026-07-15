@@ -9,7 +9,7 @@ interface CutPanelProps {
   error: string | null;
   hasResult: boolean;
   showCut: boolean;
-  onCut: (axis: SplitAxis, positionRatio: number) => void;
+  onCut: (axis: SplitAxis, positionRatio: number, pins: boolean) => void;
   onToggleShowCut: () => void;
   onDownloadHalf: (half: 'A' | 'B') => void;
 }
@@ -27,6 +27,7 @@ export default function CutPanel({
 }: CutPanelProps) {
   const [axis, setAxis] = useState<SplitAxis>('z');
   const [positionPct, setPositionPct] = useState(50);
+  const [pins, setPins] = useState(true);
 
   return (
     <details className="tcard w-full p-4">
@@ -76,8 +77,13 @@ export default function CutPanel({
             />
           </div>
 
+          <label className="mt-2 flex items-center gap-2 text-xs text-slate-400">
+            <input type="checkbox" checked={pins} onChange={() => setPins((prev) => !prev)} />
+            Styrepinner (for liming)
+          </label>
+
           <button
-            onClick={() => onCut(axis, positionPct / 100)}
+            onClick={() => onCut(axis, positionPct / 100, pins)}
             disabled={isCutting}
             className="mt-3 w-full rounded-md border border-slate-600 py-1.5 text-xs text-slate-200 hover:border-slate-400 disabled:opacity-50"
           >
