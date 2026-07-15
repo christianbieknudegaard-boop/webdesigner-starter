@@ -339,7 +339,7 @@ export default function Home() {
 
       <main>
         <section
-          className="relative h-[75vh] w-full overflow-hidden border-b border-slate-800/80"
+          className="relative w-full border-b border-slate-800/80"
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault();
@@ -347,23 +347,25 @@ export default function Home() {
             if (file) handleFile(file);
           }}
         >
-          <ModelViewer
-            object={displayObject}
-            scale={scale}
-            measureMode={measureMode}
-            measurePoints={measurePoints}
-            markerSize={markerSize}
-            onMeasureClick={handleMeasureClick}
-            transparent={transparentView}
-          />
-          {!object && <UploadZone onFile={handleFile} isLoading={isLoading} error={error} />}
-          {object && error && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 rounded-lg border border-red-500/50 bg-red-950/80 px-4 py-2 text-xs text-red-200 backdrop-blur-sm">
-              {error}
-            </div>
-          )}
-          {object && stats && (
-            <>
+          {/* On small screens the panel column flows below the viewer instead
+              of overlaying it, so the model stays visible. */}
+          <div className="relative h-[75vh] w-full overflow-hidden max-sm:h-[45vh]">
+            <ModelViewer
+              object={displayObject}
+              scale={scale}
+              measureMode={measureMode}
+              measurePoints={measurePoints}
+              markerSize={markerSize}
+              onMeasureClick={handleMeasureClick}
+              transparent={transparentView}
+            />
+            {!object && <UploadZone onFile={handleFile} isLoading={isLoading} error={error} />}
+            {object && error && (
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 rounded-lg border border-red-500/50 bg-red-950/80 px-4 py-2 text-xs text-red-200 backdrop-blur-sm">
+                {error}
+              </div>
+            )}
+            {object && stats && (
               <MeasureOverlay
                 active={measureMode}
                 onToggle={handleToggleMeasure}
@@ -372,7 +374,11 @@ export default function Home() {
                 unit={unit}
                 onReset={() => setMeasurePoints([])}
               />
-              <aside className="absolute inset-y-0 right-0 w-72 space-y-3 overflow-y-auto p-4 max-sm:w-64">
+            )}
+          </div>
+          {object && stats && (
+            <>
+              <aside className="space-y-3 p-4 sm:absolute sm:inset-y-0 sm:right-0 sm:w-72 sm:overflow-y-auto">
                 <StatsPanel
                   stats={stats}
                   scale={scale}
