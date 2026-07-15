@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
 import { Canvas, type ThreeEvent } from '@react-three/fiber';
 import { Bounds, Grid, Line, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
@@ -12,6 +12,7 @@ interface ModelViewerProps {
   measurePoints: THREE.Vector3[];
   markerSize: number;
   onMeasureClick: (point: THREE.Vector3) => void;
+  transparent?: boolean;
 }
 
 export default function ModelViewer({
@@ -21,12 +22,25 @@ export default function ModelViewer({
   measurePoints,
   markerSize,
   onMeasureClick,
+  transparent = false,
 }: ModelViewerProps) {
   const handleClick = (event: ThreeEvent<MouseEvent>) => {
     if (!measureMode) return;
     event.stopPropagation();
     onMeasureClick(event.point.clone());
   };
+
+  useEffect(() => {
+    if (!object) return;
+    object.traverse((child) => {
+      if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+        child.material.transparent = transparent;
+        child.material.opacity = transparent ? 0.35 : 1;
+        child.material.depthWrite = !transparent;
+        child.material.needsUpdate = true;
+      }
+    });
+  }, [object, transparent]);
 
   return (
     <Canvas
