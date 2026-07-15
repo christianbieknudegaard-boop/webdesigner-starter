@@ -13,7 +13,8 @@ import RoadmapSection from '@/components/RoadmapSection';
 import { parseModelFile } from '@/lib/parseModel';
 import { createShell } from '@/lib/shellModel';
 import type { MeshHealthReport } from '@/lib/meshRepair';
-import { analyzeMeshInWorker, repairMeshInWorker } from '@/lib/meshClient';
+import { analyzeMeshInWorker, runGeometryOp, type GeometryOpResult } from '@/lib/meshClient';
+import OptimizePanel, { type OptimizeOp } from '@/components/OptimizePanel';
 import type { MoldOptions, SplitAxis } from '@/lib/moldGenerator';
 import { generateMoldInWorker, type MoldClientResult } from '@/lib/moldClient';
 import { analyzeDemoldability, recommendSplitAxis } from '@/lib/demoldAnalysis';
@@ -54,6 +55,9 @@ export default function Home() {
   const [moldError, setMoldError] = useState<string | null>(null);
   const [showMold, setShowMold] = useState(false);
 
+  const [optimizeBusy, setOptimizeBusy] = useState<OptimizeOp | null>(null);
+  const [optimizeStatus, setOptimizeStatus] = useState<string | null>(null);
+
   // Guards async worker results against arriving after the model changed.
   const analysisToken = useRef(0);
 
@@ -87,6 +91,7 @@ export default function Home() {
         resetShellState();
         resetMoldState();
         setRepairedCount(null);
+        setOptimizeStatus(null);
 
         const mesh = getSingleMesh(result.object);
         setBaseGeometry(mesh?.geometry ?? null);
@@ -124,6 +129,7 @@ export default function Home() {
     setBaseGeometry(null);
     setHealth(null);
     setRepairedCount(null);
+    setOptimizeStatus(null);
   }, [resetShellState, resetMoldState]);
 
   const handleScaleChange = useCallback(
@@ -160,26 +166,74 @@ export default function Home() {
     [demoldReports]
   );
 
-  const handleRepair = useCallback(async () => {
-    if (!baseGeometry) return;
-    setIsRepairing(true);
-    const token = ++analysisToken.current;
-
-    try {
-      const result = await repairMeshInWorker(baseGeometry);
-      if (analysisToken.current !== token) return; // model changed meanwhile
+  /** Runs a geometry-transforming worker op and swaps in the result,
+   *  invalidating everything derived from the old geometry. */
+  const applyGeometryOp = useCallback(
+    async (op: 'repair' | 'simplify' | 'loose' | 'smooth', amount?: number) => {
+      if (!baseGeometry) return null;
+      const token = ++analysisToken.current;
+      const result = await runGeometryOp(baseGeometry, op, amount);
+      if (analysisToken.current !== token) return null; // model changed meanwhile
       setBaseGeometry(result.geometry);
       setHealth(result.report);
-      setRepairedCount(result.holesFilled);
+      setStats((prev) =>
+        prev
+          ? {
+              ...prev,
+              triangleCount: Math.round(result.triangleCount),
+              vertexCount: result.vertexCount,
+            }
+          : prev
+      );
       resetShellState();
       resetMoldState();
       setMeasurePoints([]);
+      return result;
+    },
+    [baseGeometry, resetShellState, resetMoldState]
+  );
+
+  const handleRepair = useCallback(async () => {
+    setIsRepairing(true);
+    try {
+      const result = await applyGeometryOp('repair');
+      if (result) setRepairedCount(result.detail);
     } catch {
       /* leave state untouched on failure */
     } finally {
       setIsRepairing(false);
     }
-  }, [baseGeometry, resetShellState, resetMoldState]);
+  }, [applyGeometryOp]);
+
+  const handleOptimize = useCallback(
+    async (op: OptimizeOp, amount?: number) => {
+      const before = stats?.triangleCount ?? 0;
+      setOptimizeBusy(op);
+      setOptimizeStatus(null);
+      try {
+        const result: GeometryOpResult | null = await applyGeometryOp(op, amount);
+        if (!result) return;
+        if (op === 'simplify') {
+          setOptimizeStatus(
+            `${before.toLocaleString('nb-NO')} → ${Math.round(result.triangleCount).toLocaleString('nb-NO')} triangler`
+          );
+        } else if (op === 'loose') {
+          setOptimizeStatus(
+            result.detail > 0
+              ? `Fjernet ${result.detail} løse del${result.detail === 1 ? '' : 'er'}`
+              : 'Ingen løse deler funnet'
+          );
+        } else {
+          setOptimizeStatus('Overflaten er glattet ut');
+        }
+      } catch (err) {
+        setOptimizeStatus(err instanceof Error ? err.message : 'Operasjonen feilet.');
+      } finally {
+        setOptimizeBusy(null);
+      }
+    },
+    [applyGeometryOp, stats]
+  );
 
   const handleHollow = useCallback(
     (thicknessInCurrentUnit: number) => {
@@ -326,15 +380,22 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#05070d] text-slate-100">
       <header className="border-b border-slate-800/80">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-          <div>
-            <h1 className="text-lg font-semibold tracking-tight">MeshForge</h1>
-            <p className="text-xs text-slate-400">3D-verktøy for makere og modellbyggere</p>
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-3">
+            <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" strokeWidth="1.5">
+              <path d="M12 2 3 7v10l9 5 9-5V7L12 2Z" stroke="#f59e0b" />
+              <path d="M12 22V12M12 12 3 7M12 12l9-5" stroke="#2dd4bf" />
+            </svg>
+            <div>
+              <h1 className="font-mono text-base font-bold tracking-[0.3em] text-slate-100">
+                MESHFORGE
+              </h1>
+              <p className="text-[11px] text-slate-500">3D-verktøy for makere og modellbyggere</p>
+            </div>
           </div>
-          <span className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-400">
-            STL · OBJ
-          </span>
+          <span className="tlabel rounded-full border border-slate-700 px-3 py-1">STL · OBJ</span>
         </div>
+        <div className="h-px w-full bg-gradient-to-r from-amber-500/60 via-teal-400/40 to-transparent" />
       </header>
 
       <main>
@@ -395,6 +456,13 @@ export default function Home() {
                   lastRepairCount={repairedCount}
                   onRepair={handleRepair}
                 />
+                <OptimizePanel
+                  supported={singleMesh !== null}
+                  triangleCount={stats.triangleCount}
+                  busy={optimizeBusy}
+                  status={optimizeStatus}
+                  onRun={handleOptimize}
+                />
                 <ShellPanel
                   supported={singleMesh !== null}
                   unit={unit}
@@ -438,8 +506,8 @@ export default function Home() {
         <RoadmapSection />
       </main>
 
-      <footer className="border-t border-slate-800/80 py-6 text-center text-xs text-slate-500">
-        Bygget som en åpen, nettbasert erstatning for MoldBoxer og Meshcast.
+      <footer className="border-t border-slate-800/80 py-6 text-center font-mono text-[11px] tracking-widest text-slate-600 uppercase">
+        Meshforge · åpen, nettbasert erstatning for MoldBoxer og Meshcast
       </footer>
     </div>
   );

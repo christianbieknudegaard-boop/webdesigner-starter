@@ -3,6 +3,8 @@
 :root {
   --background: #05070d;
   --foreground: #ededed;
+  --accent: #f59e0b;
+  --accent-2: #2dd4bf;
 }
 
 @theme inline {
@@ -13,7 +15,58 @@
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
+  /* Blueprint grid: the app is a workshop tool, let it look like one. */
+  background-image:
+    linear-gradient(rgba(59, 130, 246, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59, 130, 246, 0.045) 1px, transparent 1px);
+  background-size: 28px 28px;
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Technical panel card: hairline border with drafting-style corner brackets. */
+.tcard {
+  position: relative;
+  border: 1px solid rgba(71, 85, 105, 0.5);
+  background: rgba(6, 10, 20, 0.85);
+  border-radius: 0.5rem;
+  backdrop-filter: blur(6px);
+}
+.tcard::before,
+.tcard::after {
+  content: "";
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+}
+.tcard::before {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid rgba(245, 158, 11, 0.65);
+  border-left: 2px solid rgba(245, 158, 11, 0.65);
+  border-top-left-radius: 0.5rem;
+}
+.tcard::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid rgba(45, 212, 191, 0.55);
+  border-right: 2px solid rgba(45, 212, 191, 0.55);
+  border-bottom-right-radius: 0.5rem;
+}
+
+/* Drafting-style section label: mono, uppercase, numbered. */
+.tlabel {
+  font-family: var(--font-geist-mono), monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: rgb(203 213 225);
+}
+.tnum {
+  color: rgba(245, 158, 11, 0.9);
+  margin-right: 0.55rem;
+  font-weight: 400;
 }

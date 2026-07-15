@@ -1,11 +1,14 @@
 import * as THREE from 'three';
 import type { MeshHealthReport } from '@/lib/meshRepair';
-import type { MeshWorkerRequest, MeshWorkerResponse } from '@/lib/meshWorker';
+import type { MeshWorkerOp, MeshWorkerRequest, MeshWorkerResponse } from '@/lib/meshWorker';
 
-export interface RepairClientResult {
+export interface GeometryOpResult {
   geometry: THREE.BufferGeometry;
-  holesFilled: number;
   report: MeshHealthReport;
+  triangleCount: number;
+  vertexCount: number;
+  /** repair: holes filled; loose: parts removed; simplify: achieved error. */
+  detail: number;
 }
 
 type MeshWorkerSuccess = Extract<MeshWorkerResponse, { ok: true }>;
@@ -20,7 +23,7 @@ function runMeshWorker(request: MeshWorkerRequest): Promise<MeshWorkerSuccess> {
     };
     worker.onerror = () => {
       worker.terminate();
-      reject(new Error('Meshanalysen feilet i bakgrunnstråden.'));
+      reject(new Error('Meshoperasjonen feilet i bakgrunnstråden.'));
     };
     const transfer: ArrayBuffer[] = [request.positions.buffer as ArrayBuffer];
     if (request.index) transfer.push(request.index.buffer as ArrayBuffer);
@@ -50,18 +53,27 @@ export async function analyzeMeshInWorker(
   return response.report;
 }
 
-/** Runs hole filling in a Web Worker and rebuilds the repaired geometry. */
-export async function repairMeshInWorker(
-  geometry: THREE.BufferGeometry
-): Promise<RepairClientResult> {
+/** Runs a geometry-transforming op (repair/simplify/loose/smooth) in the
+ *  worker and rebuilds the resulting geometry with fresh normals. */
+export async function runGeometryOp(
+  geometry: THREE.BufferGeometry,
+  op: Exclude<MeshWorkerOp, 'analyze'>,
+  amount?: number
+): Promise<GeometryOpResult> {
   const { positions, index } = extract(geometry);
-  const response = await runMeshWorker({ op: 'repair', positions, index });
-  if (response.op !== 'repair') throw new Error('Uventet svar fra meshreparasjonen.');
+  const response = await runMeshWorker({ op, positions, index, amount });
+  if (response.op === 'analyze') throw new Error('Uventet svar fra meshoperasjonen.');
 
-  const repaired = new THREE.BufferGeometry();
-  repaired.setAttribute('position', new THREE.BufferAttribute(response.positions, 3));
-  if (response.index) repaired.setIndex(new THREE.BufferAttribute(response.index, 1));
-  repaired.computeVertexNormals();
+  const rebuilt = new THREE.BufferGeometry();
+  rebuilt.setAttribute('position', new THREE.BufferAttribute(response.positions, 3));
+  if (response.index) rebuilt.setIndex(new THREE.BufferAttribute(response.index, 1));
+  rebuilt.computeVertexNormals();
 
-  return { geometry: repaired, holesFilled: response.holesFilled, report: response.report };
+  return {
+    geometry: rebuilt,
+    report: response.report,
+    triangleCount: response.triangleCount,
+    vertexCount: response.vertexCount,
+    detail: response.detail,
+  };
 }

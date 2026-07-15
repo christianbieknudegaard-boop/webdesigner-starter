@@ -41,9 +41,9 @@ export default function StatsPanel({
   };
 
   return (
-    <div className="w-full rounded-xl border border-slate-700 bg-slate-900/80 p-4 backdrop-blur-sm">
+    <div className="tcard w-full p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-100">Modellinfo</h3>
+        <h3 className="tlabel"><span className="tnum">01</span>Modellinfo</h3>
         <button
           onClick={() => onUnitChange(unit === 'mm' ? 'in' : 'mm')}
           className="rounded-md border border-slate-600 px-2 py-0.5 text-xs text-slate-300 hover:border-slate-400"

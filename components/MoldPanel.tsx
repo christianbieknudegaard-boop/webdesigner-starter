@@ -73,9 +73,9 @@ export default function MoldPanel({
   }
 
   return (
-    <details className="w-full rounded-xl border border-slate-700 bg-slate-900/80 p-4 backdrop-blur-sm">
-      <summary className="cursor-pointer list-none text-sm font-semibold text-slate-100 select-none [&::-webkit-details-marker]:hidden">
-        Mold-generator
+    <details className="tcard w-full p-4">
+      <summary className="tlabel cursor-pointer list-none select-none [&::-webkit-details-marker]:hidden">
+        <span className="tnum">05</span>Mold-generator
       </summary>
 
       {!supported ? (
