@@ -15,6 +15,7 @@ import { createShell } from '@/lib/shellModel';
 import { analyzeMesh, repairMesh, type MeshHealthReport } from '@/lib/meshRepair';
 import type { MoldOptions, SplitAxis } from '@/lib/moldGenerator';
 import { generateMoldInWorker, type MoldClientResult } from '@/lib/moldClient';
+import { analyzeDemoldability, recommendSplitAxis } from '@/lib/demoldAnalysis';
 import { downloadGeometryAsSTL } from '@/lib/exportModel';
 import { getSingleMesh } from '@/lib/meshUtils';
 import type { ModelStats } from '@/types/model';
@@ -123,6 +124,15 @@ export default function Home() {
   }, []);
 
   const singleMesh = useMemo(() => (object ? getSingleMesh(object) : null), [object]);
+
+  const demoldReports = useMemo(
+    () => (baseGeometry ? analyzeDemoldability(baseGeometry) : null),
+    [baseGeometry]
+  );
+  const recommendedAxis = useMemo(
+    () => (demoldReports ? recommendSplitAxis(demoldReports) : null),
+    [demoldReports]
+  );
 
   const handleRepair = useCallback(() => {
     if (!baseGeometry) return;
@@ -342,6 +352,8 @@ export default function Home() {
                   error={moldError}
                   hasResult={moldResult !== null}
                   showMold={showMold}
+                  demold={demoldReports}
+                  recommendedAxis={recommendedAxis}
                   siliconeMl={
                     moldResult ? (moldResult.siliconeVolume * scale ** 3) / 1000 : null
                   }

@@ -7,6 +7,7 @@ export interface MoldOptions {
   pourChannel: boolean;
   registrationKeys: boolean;
   bandGrooves: boolean;
+  prySlots: boolean;
 }
 
 export interface MoldResult {
@@ -141,7 +142,12 @@ export function generateMold(
   sourceGeometry: THREE.BufferGeometry,
   margin: number,
   splitAxis: SplitAxis,
-  options: MoldOptions = { pourChannel: true, registrationKeys: true, bandGrooves: true }
+  options: MoldOptions = {
+    pourChannel: true,
+    registrationKeys: true,
+    bandGrooves: true,
+    prySlots: true,
+  }
 ): MoldResult {
   if (!(margin > 0)) {
     throw new Error('Randmargin må være større enn 0.');
@@ -265,6 +271,29 @@ export function generateMold(
       const coreBrush = brushAt(new THREE.BoxGeometry(...innerDims), ringCenter);
       const ringBrush = evaluator.evaluate(slabBrush, coreBrush, SUBTRACTION);
       cavityBrush = evaluator.evaluate(cavityBrush, ringBrush, SUBTRACTION);
+    }
+  }
+
+  if (options.prySlots) {
+    // Two screwdriver notches straddling the parting seam on the side faces
+    // the seam crosses, so the halves can be levered apart after casting.
+    // Placed at mid pour-height: clear of the band grooves (at ±27%), the
+    // registration keys (at the corners), and the funnel (top face).
+    const thirdIndex = AXIS_INDEX[thirdAxis];
+    const slotDims: [number, number, number] = [0, 0, 0];
+    slotDims[AXIS_INDEX[splitAxis]] = margin * 0.9; // opening across the seam
+    slotDims[thirdIndex] = margin * 0.8; // centered on the wall -> cuts 0.4*margin deep
+    slotDims[AXIS_INDEX[pourAxis]] = margin * 0.6;
+
+    for (const side of [-1, 1]) {
+      const slotCenter = center.clone();
+      slotCenter.setComponent(AXIS_INDEX[splitAxis], splitValue);
+      slotCenter.setComponent(
+        thirdIndex,
+        center.getComponent(thirdIndex) + (side * outerSize.getComponent(thirdIndex)) / 2
+      );
+      const slotBrush = brushAt(new THREE.BoxGeometry(...slotDims), slotCenter);
+      cavityBrush = evaluator.evaluate(cavityBrush, slotBrush, SUBTRACTION);
     }
   }
 

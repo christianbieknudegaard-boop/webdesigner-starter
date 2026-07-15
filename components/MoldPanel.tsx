@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { MoldOptions, SplitAxis } from '@/lib/moldGenerator';
+import type { DemoldAxisReport } from '@/lib/demoldAnalysis';
 
 type Unit = 'mm' | 'in';
 
@@ -13,9 +14,21 @@ interface MoldPanelProps {
   hasResult: boolean;
   showMold: boolean;
   siliconeMl: number | null;
+  demold: DemoldAxisReport[] | null;
+  recommendedAxis: SplitAxis | null;
   onGenerate: (margin: number, axis: SplitAxis, options: MoldOptions) => void;
   onToggleShowMold: () => void;
   onDownloadHalf: (half: 'A' | 'B') => void;
+}
+
+function undercutBadgeClass(fraction: number, selected: boolean): string {
+  const tone =
+    fraction < 0.005
+      ? 'text-emerald-300'
+      : fraction < 0.1
+        ? 'text-amber-300'
+        : 'text-red-400';
+  return `${tone} ${selected ? 'font-semibold underline underline-offset-2' : ''}`;
 }
 
 export default function MoldPanel({
@@ -26,6 +39,8 @@ export default function MoldPanel({
   hasResult,
   showMold,
   siliconeMl,
+  demold,
+  recommendedAxis,
   onGenerate,
   onToggleShowMold,
   onDownloadHalf,
@@ -35,6 +50,15 @@ export default function MoldPanel({
   const [pourChannel, setPourChannel] = useState(true);
   const [registrationKeys, setRegistrationKeys] = useState(true);
   const [bandGrooves, setBandGrooves] = useState(true);
+  const [prySlots, setPrySlots] = useState(true);
+
+  // Follow the recommendation whenever a new model produces one
+  // (state adjusted during render, per React's "you might not need an effect").
+  const [lastRecommended, setLastRecommended] = useState<SplitAxis | null>(null);
+  if (recommendedAxis !== lastRecommended) {
+    setLastRecommended(recommendedAxis);
+    if (recommendedAxis) setAxis(recommendedAxis);
+  }
 
   return (
     <details className="w-full rounded-xl border border-slate-700 bg-slate-900/80 p-4 backdrop-blur-sm">
@@ -79,6 +103,28 @@ export default function MoldPanel({
             </select>
           </div>
 
+          {demold && (
+            <div className="mt-2 rounded-md border border-slate-800 bg-slate-950/40 px-2 py-1.5 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Avformbarhet</span>
+                <span className="flex gap-3">
+                  {demold.map((report) => (
+                    <span
+                      key={report.axis}
+                      className={undercutBadgeClass(report.undercutFraction, report.axis === axis)}
+                    >
+                      {report.axis.toUpperCase()} {Math.round(report.undercutFraction * 100)}%
+                    </span>
+                  ))}
+                </span>
+              </div>
+              <p className="mt-1 text-[10px] leading-snug text-slate-500">
+                Andel av flaten med undercuts per delingsakse. Stive støp (resin/gips) krever
+                0 % – silikon tåler moderate undercuts.
+              </p>
+            </div>
+          )}
+
           <div className="mt-2 space-y-1.5 text-xs">
             <label className="flex items-center gap-2 text-slate-400">
               <input
@@ -104,10 +150,20 @@ export default function MoldPanel({
               />
               Strikk-spor (klemming)
             </label>
+            <label className="flex items-center gap-2 text-slate-400">
+              <input
+                type="checkbox"
+                checked={prySlots}
+                onChange={() => setPrySlots((prev) => !prev)}
+              />
+              Vippespor (åpning)
+            </label>
           </div>
 
           <button
-            onClick={() => onGenerate(margin, axis, { pourChannel, registrationKeys, bandGrooves })}
+            onClick={() =>
+              onGenerate(margin, axis, { pourChannel, registrationKeys, bandGrooves, prySlots })
+            }
             disabled={isGenerating || !(margin > 0)}
             className="mt-3 w-full rounded-md border border-slate-600 py-1.5 text-xs text-slate-200 hover:border-slate-400 disabled:opacity-50"
           >
