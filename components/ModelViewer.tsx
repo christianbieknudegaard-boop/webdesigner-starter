@@ -1,15 +1,33 @@
 'use client';
 
 import { Suspense } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { Bounds, Grid, OrbitControls } from '@react-three/drei';
+import { Canvas, type ThreeEvent } from '@react-three/fiber';
+import { Bounds, Grid, Line, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 
 interface ModelViewerProps {
   object: THREE.Object3D | null;
+  scale: number;
+  measureMode: boolean;
+  measurePoints: THREE.Vector3[];
+  markerSize: number;
+  onMeasureClick: (point: THREE.Vector3) => void;
 }
 
-export default function ModelViewer({ object }: ModelViewerProps) {
+export default function ModelViewer({
+  object,
+  scale,
+  measureMode,
+  measurePoints,
+  markerSize,
+  onMeasureClick,
+}: ModelViewerProps) {
+  const handleClick = (event: ThreeEvent<MouseEvent>) => {
+    if (!measureMode) return;
+    event.stopPropagation();
+    onMeasureClick(event.point.clone());
+  };
+
   return (
     <Canvas
       dpr={[1, 2]}
@@ -25,8 +43,19 @@ export default function ModelViewer({ object }: ModelViewerProps) {
           <directionalLight position={[100, 150, 100]} intensity={1.1} />
           <directionalLight position={[-100, 60, -80]} intensity={0.4} />
           <Bounds key={object.uuid} fit clip observe margin={1.4}>
-            <primitive object={object} />
+            <primitive object={object} scale={scale} onClick={handleClick} />
           </Bounds>
+
+          {measurePoints.map((point, index) => (
+            <mesh position={point} key={index}>
+              <sphereGeometry args={[markerSize, 16, 16]} />
+              <meshBasicMaterial color="#facc15" depthTest={false} />
+            </mesh>
+          ))}
+
+          {measurePoints.length === 2 && (
+            <Line points={measurePoints} color="#facc15" lineWidth={2} depthTest={false} />
+          )}
         </Suspense>
       ) : (
         <>

@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import * as THREE from 'three';
 import UploadZone from '@/components/UploadZone';
 import StatsPanel from '@/components/StatsPanel';
+import MeasureOverlay from '@/components/MeasureOverlay';
 import RoadmapSection from '@/components/RoadmapSection';
 import { parseModelFile } from '@/lib/parseModel';
 import type { ModelStats } from '@/types/model';
@@ -17,6 +18,12 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [unit, setUnit] = useState<'mm' | 'in'>('mm');
+  const [scale, setScale] = useState(1);
+
+  const [measureMode, setMeasureMode] = useState(false);
+  const [measurePoints, setMeasurePoints] = useState<THREE.Vector3[]>([]);
+
   const handleFile = useCallback(async (file: File) => {
     setIsLoading(true);
     setError(null);
@@ -24,6 +31,8 @@ export default function Home() {
       const result = await parseModelFile(file);
       setObject(result.object);
       setStats(result.stats);
+      setScale(1);
+      setMeasurePoints([]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Kunne ikke lese filen.');
     } finally {
@@ -35,7 +44,33 @@ export default function Home() {
     setObject(null);
     setStats(null);
     setError(null);
+    setScale(1);
+    setMeasureMode(false);
+    setMeasurePoints([]);
   }, []);
+
+  const handleScaleChange = useCallback((next: number) => {
+    if (!Number.isFinite(next) || next <= 0) return;
+    setScale(next);
+    setMeasurePoints([]);
+  }, []);
+
+  const handleMeasureClick = useCallback((point: THREE.Vector3) => {
+    setMeasurePoints((prev) => (prev.length >= 2 ? [point] : [...prev, point]));
+  }, []);
+
+  const handleToggleMeasure = useCallback(() => {
+    setMeasureMode((prev) => !prev);
+    setMeasurePoints([]);
+  }, []);
+
+  const distance =
+    measurePoints.length === 2 ? measurePoints[0].distanceTo(measurePoints[1]) : null;
+
+  const maxDimension = stats
+    ? Math.max(stats.dimensions.x, stats.dimensions.y, stats.dimensions.z) * scale
+    : 1;
+  const markerSize = Math.max(maxDimension * 0.012, 0.05);
 
   return (
     <div className="min-h-screen bg-[#05070d] text-slate-100">
@@ -53,9 +88,35 @@ export default function Home() {
 
       <main>
         <section className="relative h-[75vh] w-full overflow-hidden border-b border-slate-800/80">
-          <ModelViewer object={object} />
+          <ModelViewer
+            object={object}
+            scale={scale}
+            measureMode={measureMode}
+            measurePoints={measurePoints}
+            markerSize={markerSize}
+            onMeasureClick={handleMeasureClick}
+          />
           {!object && <UploadZone onFile={handleFile} isLoading={isLoading} error={error} />}
-          {object && stats && <StatsPanel stats={stats} onReset={handleReset} />}
+          {object && stats && (
+            <>
+              <StatsPanel
+                stats={stats}
+                scale={scale}
+                unit={unit}
+                onUnitChange={setUnit}
+                onScaleChange={handleScaleChange}
+                onReset={handleReset}
+              />
+              <MeasureOverlay
+                active={measureMode}
+                onToggle={handleToggleMeasure}
+                distance={distance}
+                pointCount={measurePoints.length}
+                unit={unit}
+                onReset={() => setMeasurePoints([])}
+              />
+            </>
+          )}
         </section>
 
         <RoadmapSection />
