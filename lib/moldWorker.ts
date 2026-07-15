@@ -1,11 +1,6 @@
 /// <reference lib="webworker" />
 import * as THREE from 'three';
-import {
-  generateMold,
-  computeSiliconeVolume,
-  type MoldOptions,
-  type SplitAxis,
-} from '@/lib/moldGenerator';
+import { generateMold, type MoldOptions, type SplitAxis } from '@/lib/moldGenerator';
 
 export interface MoldWorkerRequest {
   positions: Float32Array;
@@ -47,7 +42,6 @@ self.onmessage = (event: MessageEvent<MoldWorkerRequest>) => {
     geometry.computeVertexNormals();
 
     const result = generateMold(geometry, margin, splitAxis, options);
-    const siliconeVolume = computeSiliconeVolume(result);
 
     const a = extractArrays(result.halfA);
     const b = extractArrays(result.halfB);
@@ -60,7 +54,7 @@ self.onmessage = (event: MessageEvent<MoldWorkerRequest>) => {
       indexB: b.index,
       splitAxis: result.splitAxis,
       boxSize: result.boxSize,
-      siliconeVolume,
+      siliconeVolume: result.siliconeVolume,
     };
 
     const transfer: ArrayBuffer[] = [a.positions.buffer as ArrayBuffer, b.positions.buffer as ArrayBuffer];

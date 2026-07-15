@@ -60,7 +60,8 @@ export default function RepairPanel({
 
           {health.nonManifoldEdgeCount > 0 && (
             <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
-              Ikke-manifold kanter kan ikke fikses automatisk ennå.
+              Ikke-manifold kanter kan ikke fikses automatisk ennå. På CSG-genererte modeller
+              (f.eks. mold-halvdeler) er dette som regel ufarlige sømmer.
             </p>
           )}
         </>

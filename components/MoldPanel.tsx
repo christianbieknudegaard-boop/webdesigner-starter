@@ -34,6 +34,7 @@ export default function MoldPanel({
   const [axis, setAxis] = useState<SplitAxis>('z');
   const [pourChannel, setPourChannel] = useState(true);
   const [registrationKeys, setRegistrationKeys] = useState(true);
+  const [bandGrooves, setBandGrooves] = useState(true);
 
   return (
     <details className="w-full rounded-xl border border-slate-700 bg-slate-900/80 p-4 backdrop-blur-sm">
@@ -95,10 +96,18 @@ export default function MoldPanel({
               />
               Styrepinner (kulelås)
             </label>
+            <label className="flex items-center gap-2 text-slate-400">
+              <input
+                type="checkbox"
+                checked={bandGrooves}
+                onChange={() => setBandGrooves((prev) => !prev)}
+              />
+              Strikk-spor (klemming)
+            </label>
           </div>
 
           <button
-            onClick={() => onGenerate(margin, axis, { pourChannel, registrationKeys })}
+            onClick={() => onGenerate(margin, axis, { pourChannel, registrationKeys, bandGrooves })}
             disabled={isGenerating || !(margin > 0)}
             className="mt-3 w-full rounded-md border border-slate-600 py-1.5 text-xs text-slate-200 hover:border-slate-400 disabled:opacity-50"
           >

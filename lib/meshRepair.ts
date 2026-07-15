@@ -68,6 +68,83 @@ function collectBoundaryEdges(geometry: THREE.BufferGeometry): {
   return { boundaryEdges, nonManifoldEdgeCount };
 }
 
+/**
+ * CSG output is full of T-junction seams: a long triangle edge geometrically
+ * covered by several shorter collinear edges from the neighbouring surface.
+ * Edge-counting sees all of them as "open" although the surface is closed.
+ * Filter out boundary edges whose midpoint lies on another boundary edge so
+ * only genuinely open borders are treated as holes.
+ */
+function filterSeamEdges(
+  boundaryEdges: BoundaryEdge[],
+  position: THREE.BufferAttribute | THREE.InterleavedBufferAttribute
+): BoundaryEdge[] {
+  if (boundaryEdges.length < 2) return boundaryEdges;
+
+  const segments = boundaryEdges.map((edge) => {
+    const a = new THREE.Vector3().fromBufferAttribute(position, edge.from);
+    const b = new THREE.Vector3().fromBufferAttribute(position, edge.to);
+    return { a, b, mid: a.clone().add(b).multiplyScalar(0.5) };
+  });
+
+  const bounds = new THREE.Box3();
+  for (const { a, b } of segments) {
+    bounds.expandByPoint(a);
+    bounds.expandByPoint(b);
+  }
+  const diagonal = bounds.getSize(new THREE.Vector3()).length() || 1;
+  const epsilon = Math.max(diagonal * 1e-5, 1e-4);
+  const cellSize = Math.max(diagonal / 64, epsilon * 8);
+
+  const grid = new Map<string, number[]>();
+  const cellKey = (p: THREE.Vector3) =>
+    `${Math.floor(p.x / cellSize)}_${Math.floor(p.y / cellSize)}_${Math.floor(p.z / cellSize)}`;
+
+  const sample = new THREE.Vector3();
+  segments.forEach((segment, index) => {
+    // Register the segment in every cell it passes through.
+    const steps = Math.max(1, Math.ceil(segment.a.distanceTo(segment.b) / cellSize));
+    for (let s = 0; s <= steps; s++) {
+      sample.lerpVectors(segment.a, segment.b, s / steps);
+      const key = cellKey(sample);
+      const bucket = grid.get(key);
+      if (bucket) {
+        if (bucket[bucket.length - 1] !== index) bucket.push(index);
+      } else {
+        grid.set(key, [index]);
+      }
+    }
+  });
+
+  const line = new THREE.Line3();
+  const closest = new THREE.Vector3();
+
+  return boundaryEdges.filter((_, index) => {
+    const { mid } = segments[index];
+    const cx = Math.floor(mid.x / cellSize);
+    const cy = Math.floor(mid.y / cellSize);
+    const cz = Math.floor(mid.z / cellSize);
+
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dz = -1; dz <= 1; dz++) {
+          const bucket = grid.get(`${cx + dx}_${cy + dy}_${cz + dz}`);
+          if (!bucket) continue;
+          for (const other of bucket) {
+            if (other === index) continue;
+            line.set(segments[other].a, segments[other].b);
+            line.closestPointToPoint(mid, true, closest);
+            if (closest.distanceTo(mid) < epsilon) {
+              return false; // seam, not a real hole border
+            }
+          }
+        }
+      }
+    }
+    return true;
+  });
+}
+
 function buildLoops(boundaryEdges: BoundaryEdge[]): { loops: number[][]; leftover: number } {
   const next = new Map<number, number>();
   for (const edge of boundaryEdges) {
@@ -117,22 +194,24 @@ function buildLoops(boundaryEdges: BoundaryEdge[]): { loops: number[][]; leftove
 export function analyzeMesh(geometry: THREE.BufferGeometry): MeshHealthReport {
   const welded = weldByPosition(geometry);
   const { boundaryEdges, nonManifoldEdgeCount } = collectBoundaryEdges(welded);
-  const { loops, leftover } = buildLoops(boundaryEdges);
+  const realBoundary = filterSeamEdges(boundaryEdges, welded.attributes.position);
+  const { loops } = buildLoops(realBoundary);
 
   return {
     holeCount: loops.length,
-    boundaryEdgeCount: boundaryEdges.length,
-    nonManifoldEdgeCount: nonManifoldEdgeCount + leftover,
+    boundaryEdgeCount: realBoundary.length,
+    nonManifoldEdgeCount,
   };
 }
 
 export function repairMesh(geometry: THREE.BufferGeometry): RepairResult {
   const welded = weldByPosition(geometry);
-  const { boundaryEdges, nonManifoldEdgeCount } = collectBoundaryEdges(welded);
-  const { loops, leftover } = buildLoops(boundaryEdges);
+  const { boundaryEdges } = collectBoundaryEdges(welded);
+  const realBoundary = filterSeamEdges(boundaryEdges, welded.attributes.position);
+  const { loops, leftover } = buildLoops(realBoundary);
 
   if (loops.length === 0) {
-    return { geometry: welded, holesFilled: 0, remainingBoundaryEdges: leftover + nonManifoldEdgeCount };
+    return { geometry: welded, holesFilled: 0, remainingBoundaryEdges: leftover };
   }
 
   const position = welded.attributes.position;
@@ -166,6 +245,6 @@ export function repairMesh(geometry: THREE.BufferGeometry): RepairResult {
   return {
     geometry: repaired,
     holesFilled: loops.length,
-    remainingBoundaryEdges: leftover + nonManifoldEdgeCount,
+    remainingBoundaryEdges: leftover,
   };
 }

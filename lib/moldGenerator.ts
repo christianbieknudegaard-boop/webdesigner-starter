@@ -6,6 +6,7 @@ export type SplitAxis = 'x' | 'y' | 'z';
 export interface MoldOptions {
   pourChannel: boolean;
   registrationKeys: boolean;
+  bandGrooves: boolean;
 }
 
 export interface MoldResult {
@@ -13,6 +14,8 @@ export interface MoldResult {
   halfB: THREE.BufferGeometry;
   splitAxis: SplitAxis;
   boxSize: { x: number; y: number; z: number };
+  /** Empty space in the assembled mold (cavity + pour channel), native units cubed. */
+  siliconeVolume: number;
 }
 
 const AXIS_INDEX: Record<SplitAxis, 0 | 1 | 2> = { x: 0, y: 1, z: 2 };
@@ -58,20 +61,87 @@ function cylinderRotationFor(axis: SplitAxis): THREE.Euler {
 }
 
 /**
+ * Finds where along the parting line the pour channel should enter: sample
+ * across the model, raycast down the pour axis, and keep the highest surface
+ * hit (ties broken toward the center). For solid models this is simply the
+ * top; for open vessels (cups, flower pots) the naive "center of the top"
+ * would drop the channel into the mold core - a dead-end tube that never
+ * reaches the casting cavity - so the rim wins instead.
+ */
+function findPourPoint(
+  modelGeometry: THREE.BufferGeometry,
+  box: THREE.Box3,
+  center: THREE.Vector3,
+  splitValue: number,
+  splitAxis: SplitAxis,
+  pourAxis: SplitAxis,
+  thirdAxis: SplitAxis
+): { thirdCoord: number; surfaceCoord: number } {
+  const pourIndex = AXIS_INDEX[pourAxis];
+  const thirdIndex = AXIS_INDEX[thirdAxis];
+
+  const probe = new THREE.Mesh(
+    modelGeometry,
+    new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })
+  );
+  probe.updateMatrixWorld();
+
+  const raycaster = new THREE.Raycaster();
+  const direction = new THREE.Vector3();
+  direction.setComponent(pourIndex, -1);
+
+  const uMin = box.min.getComponent(thirdIndex);
+  const uMax = box.max.getComponent(thirdIndex);
+  const uCenter = center.getComponent(thirdIndex);
+  const rayTop = box.max.getComponent(pourIndex) + 10;
+
+  let bestU = uCenter;
+  let bestHit = -Infinity;
+  let bestDistToCenter = Infinity;
+  const SAMPLES = 60;
+
+  for (let i = 0; i <= SAMPLES; i++) {
+    const u = uMin + ((uMax - uMin) * i) / SAMPLES;
+    const origin = center.clone();
+    origin.setComponent(AXIS_INDEX[splitAxis], splitValue);
+    origin.setComponent(thirdIndex, u);
+    origin.setComponent(pourIndex, rayTop);
+
+    raycaster.set(origin, direction);
+    const hits = raycaster.intersectObject(probe, false);
+    if (hits.length === 0) continue;
+
+    const hitCoord = hits[0].point.getComponent(pourIndex);
+    const distToCenter = Math.abs(u - uCenter);
+    if (hitCoord > bestHit + 1e-6 || (Math.abs(hitCoord - bestHit) <= 1e-6 && distToCenter < bestDistToCenter)) {
+      bestHit = hitCoord;
+      bestU = u;
+      bestDistToCenter = distToCenter;
+    }
+  }
+
+  if (!Number.isFinite(bestHit)) {
+    return { thirdCoord: uCenter, surfaceCoord: box.max.getComponent(pourIndex) };
+  }
+  return { thirdCoord: bestU, surfaceCoord: bestHit };
+}
+
+/**
  * Generates a two-part 3D-printable mold around a model: an enclosing box
  * with the model's shape subtracted out to form the cavity, split into two
  * halves along the chosen axis through the model's center.
  *
- * Optionally adds a pour channel with funnel (centered on the parting plane,
- * so each half carries half the channel) and four spherical registration
- * keys - bumps on half B, matching recesses with clearance in half A - so
- * the halves align when clamped together.
+ * Options add a pour channel with funnel (centered on the parting plane and
+ * entering at the model's highest surface along it), four spherical
+ * registration keys (bumps on half B, matching clearance recesses in half A),
+ * and two rubber-band grooves around the side walls for clamping the halves
+ * together during casting.
  */
 export function generateMold(
   sourceGeometry: THREE.BufferGeometry,
   margin: number,
   splitAxis: SplitAxis,
-  options: MoldOptions = { pourChannel: true, registrationKeys: true }
+  options: MoldOptions = { pourChannel: true, registrationKeys: true, bandGrooves: true }
 ): MoldResult {
   if (!(margin > 0)) {
     throw new Error('Randmargin må være større enn 0.');
@@ -86,6 +156,7 @@ export function generateMold(
   box.getCenter(center);
 
   const outerSize = new THREE.Vector3(size.x + margin * 2, size.y + margin * 2, size.z + margin * 2);
+  const splitValue = center.getComponent(AXIS_INDEX[splitAxis]);
 
   const modelBrush = new Brush(modelGeometry);
   modelBrush.updateMatrixWorld();
@@ -100,24 +171,42 @@ export function generateMold(
   evaluator.attributes = ['position', 'normal'];
   let cavityBrush = evaluator.evaluate(boxBrush, modelBrush, SUBTRACTION);
 
+  // Pour along an axis that lies in the parting plane, so the channel is
+  // shared between the two halves. Native Z is "up" for STL models.
+  const pourAxis: SplitAxis = splitAxis === 'z' ? 'y' : 'z';
+  const thirdAxis = ALL_AXES.find((axis) => axis !== splitAxis && axis !== pourAxis)!;
+
   if (options.pourChannel) {
-    // Pour along an axis that lies in the parting plane, so the channel is
-    // shared between the two halves. Native Z is "up" for STL models.
-    const pourAxis: SplitAxis = splitAxis === 'z' ? 'y' : 'z';
     const pourIndex = AXIS_INDEX[pourAxis];
+    const thirdIndex = AXIS_INDEX[thirdAxis];
     const rotation = cylinderRotationFor(pourAxis);
 
     const channelRadius = margin * 0.5;
     const overlap = margin * 0.5; // reach into the cavity so the channel connects
     const funnelHeight = margin * 0.7;
-    const modelTop = box.max.getComponent(pourIndex);
-    const outerTop = modelTop + margin;
+    const funnelTopRadius = channelRadius * 2.2;
+    const outerTop = box.max.getComponent(pourIndex) + margin;
 
-    const neckBottom = modelTop - overlap;
+    const pour = findPourPoint(modelGeometry, box, center, splitValue, splitAxis, pourAxis, thirdAxis);
+
+    // Keep the funnel from breaking through the mold's side wall.
+    const uLimit =
+      outerSize.getComponent(thirdIndex) / 2 - funnelTopRadius - margin * 0.15;
+    const thirdCoord = THREE.MathUtils.clamp(
+      pour.thirdCoord,
+      center.getComponent(thirdIndex) - uLimit,
+      center.getComponent(thirdIndex) + uLimit
+    );
+
+    const channelCenter = center.clone();
+    channelCenter.setComponent(AXIS_INDEX[splitAxis], splitValue);
+    channelCenter.setComponent(thirdIndex, thirdCoord);
+
+    const neckBottom = pour.surfaceCoord - overlap;
     const neckTop = outerTop - funnelHeight;
-    const neckHeight = neckTop - neckBottom;
+    const neckHeight = Math.max(neckTop - neckBottom, margin * 0.1);
 
-    const neckCenter = center.clone();
+    const neckCenter = channelCenter.clone();
     neckCenter.setComponent(pourIndex, neckBottom + neckHeight / 2);
     const neckBrush = brushAt(
       new THREE.CylinderGeometry(channelRadius, channelRadius, neckHeight, 24),
@@ -128,17 +217,57 @@ export function generateMold(
 
     // Funnel flares out toward the top surface for easy pouring. Extend it a
     // hair past the surface so the boolean cut is unambiguous.
-    const funnelCenter = center.clone();
+    const funnelCenter = channelCenter.clone();
     funnelCenter.setComponent(pourIndex, neckTop + (funnelHeight + margin * 0.02) / 2);
     const funnelBrush = brushAt(
-      new THREE.CylinderGeometry(channelRadius * 2.2, channelRadius, funnelHeight + margin * 0.02, 24),
+      new THREE.CylinderGeometry(funnelTopRadius, channelRadius, funnelHeight + margin * 0.02, 24),
       funnelCenter,
       rotation
     );
     cavityBrush = evaluator.evaluate(cavityBrush, funnelBrush, SUBTRACTION);
   }
 
-  const splitValue = center.getComponent(AXIS_INDEX[splitAxis]);
+  // Estimate the silicone needed BEFORE cutting the external band grooves:
+  // grooves live on the outside of the assembled mold and never hold
+  // silicone, so they must not inflate the estimate.
+  const boxVolume = outerSize.x * outerSize.y * outerSize.z;
+  const siliconeVolume = Math.max(0, boxVolume - computeMeshVolume(cavityBrush));
+
+  if (options.bandGrooves) {
+    // Two shallow grooves wrap the four side walls (plane normal = pour
+    // axis, so they never touch the funnel face) and cross the parting
+    // plane - rubber bands seated in them clamp the halves together.
+    const bandIndex = AXIS_INDEX[pourAxis];
+    const grooveDepth = margin * 0.25;
+    const grooveWidth = margin * 0.5;
+
+    for (const side of [-1, 1]) {
+      const ringCenter = center.clone();
+      ringCenter.setComponent(
+        bandIndex,
+        center.getComponent(bandIndex) + side * outerSize.getComponent(bandIndex) * 0.27
+      );
+
+      const outerDims: [number, number, number] = [
+        outerSize.x + grooveDepth * 2,
+        outerSize.y + grooveDepth * 2,
+        outerSize.z + grooveDepth * 2,
+      ];
+      outerDims[bandIndex] = grooveWidth;
+      const innerDims: [number, number, number] = [
+        outerSize.x - grooveDepth * 2,
+        outerSize.y - grooveDepth * 2,
+        outerSize.z - grooveDepth * 2,
+      ];
+      innerDims[bandIndex] = grooveWidth * 2;
+
+      const slabBrush = brushAt(new THREE.BoxGeometry(...outerDims), ringCenter);
+      const coreBrush = brushAt(new THREE.BoxGeometry(...innerDims), ringCenter);
+      const ringBrush = evaluator.evaluate(slabBrush, coreBrush, SUBTRACTION);
+      cavityBrush = evaluator.evaluate(cavityBrush, ringBrush, SUBTRACTION);
+    }
+  }
+
   const sideABrush = buildHalfSpaceBrush(center, outerSize, splitAxis, splitValue, 1);
   const sideBBrush = buildHalfSpaceBrush(center, outerSize, splitAxis, splitValue, -1);
 
@@ -201,16 +330,6 @@ export function generateMold(
     halfB: halfBBrush.geometry,
     splitAxis,
     boxSize: { x: outerSize.x, y: outerSize.y, z: outerSize.z },
+    siliconeVolume,
   };
-}
-
-/**
- * Estimates the silicone needed to fill the assembled mold: the outer box
- * volume minus the solid material of both halves equals the empty space
- * inside (cavity + pour channel + key clearance). Native model units cubed.
- */
-export function computeSiliconeVolume(result: MoldResult): number {
-  const boxVolume = result.boxSize.x * result.boxSize.y * result.boxSize.z;
-  const solidVolume = computeMeshVolume(result.halfA) + computeMeshVolume(result.halfB);
-  return Math.max(0, boxVolume - solidVolume);
 }
