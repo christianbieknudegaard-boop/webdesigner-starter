@@ -1,56 +1,55 @@
-# Webdesign Builder
+# MeshForge
 
-En kraftig og brukervennlig webdesign-applikasjon som lar deg lage profesjonelle hjemmesider på minutter.
+En nettbasert samling 3D-verktøy for makere og modellbyggere — en åpen erstatning for
+verktøy som [MoldBoxer](https://moldboxer.com/) og [Meshcast](https://meshcast.app/).
 
 ## 🚀 Funksjoner
 
-- **Visuell redigering**: Live forhåndsvisning mens du bygger
-- **Responsivt design**: Fungerer perfekt på alle enheter
-- **Fargetilpasning**: Velg dine egne primær- og sekundærfarger
-- **Seksjonsbasert**: Hero, Om oss, Tjenester og Kontakt-seksjoner
-- **Eksport**: Last ned som HTML eller JSON-konfigurasjon
-- **Vercel-klar**: Enkel deployment til Vercel
+- **3D-viewer**: Dra-og-slipp STL-, OBJ-, GLB/GLTF- og PLY-filer (GLB er formatet de fleste AI bilde-til-3D-tjenester leverer)
+- **Orientering**: Rotér 90°, speil, og legg største flate ned
+- **Volum og vekt**: Volum i cm³ med vektestimat per materiale (PLA/PETG/ABS/resin/silikon/gips)
+- **Optimalisering**: Forenkle tunge AI-modeller (meshoptimizer), fjern løse fragmenter, glatt ut overflater
+- **Plan-kutt**: Del modellen i to vanntette deler for utskrift i biter
+- **Gravering**: Gravér eller preg tekst på valgfri flate
+- **Veggtykkelse**: BVH-basert analyse med fargekart over for tynne områder
+- **Modellinfo**: Dimensjoner, triangel- og punktantall, med mm/tommer-veksling
+- **Måling og skalering**: Klikk to punkter for å måle avstand; skriv inn ønsket mål så skaleres modellen proporsjonalt
+- **Mesh-reparasjon**: Finner og tetter hull automatisk, varsler om ikke-manifold kanter
+- **Hul-gjøring (shell)**: Gjør en solid modell hul med valgfri veggtykkelse, med gjennomsiktig kontrollvisning
+- **Mold-generator**: Genererer en todelt, 3D-printbar støpeform rundt modellen (CSG), med hellekanal/trakt, kuleformede styrepinner og strikk-spor for klemming, vist i utsprengt visning med nedlasting per halvdel og silikonestimat. Hellepunktet finnes automatisk med raycasting, så åpne kar (kopper, blomsterpotter) får kanalen over randen i stedet for en blindkanal i kjernen
+- **STL-eksport**: Last ned resultatet (originalt, reparert, hult eller mold-halvdeler) som binær STL
+- **Nettbasert**: Alt kjører i nettleseren, ingen installasjon nødvendig
 
 ## 🛠️ Teknologi
 
-- **Next.js 15** - React-rammeverk
+- **Next.js 16** - React-rammeverk
+- **React Three Fiber / drei / three.js** - 3D-rendering
 - **TypeScript** - Type-sikkerhet
 - **Tailwind CSS** - Styling
-- **React** - UI-komponenter
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
-
-## Getting Started
-
-First, run the development server:
+## Kom i gang
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Åpne [http://localhost:3000](http://localhost:3000) i nettleseren.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Deploy
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Appen bygges som en ren statisk eksport (`npm run build` gir en `out/`-mappe) og kan hostes hvor som helst.
 
-## Learn More
+### GitHub Pages (automatisk)
 
-To learn more about Next.js, take a look at the following resources:
+Repoet har en workflow (`.github/workflows/deploy.yml`) som bygger og publiserer til GitHub Pages ved hver push. Første gang kan det hende du må aktivere Pages manuelt: gå til **Settings → Pages** i repoet og sett **Source** til **"GitHub Actions"** (workflowen forsøker å aktivere dette selv, men det krever riktige tillatelser).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Siden blir tilgjengelig på:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+https://<brukernavn>.github.io/<repo-navn>/
+```
 
-## Deploy on Vercel
+### Andre alternativer
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Statisk eksport betyr at [Vercel](https://vercel.com/new), Netlify, Cloudflare Pages eller en hvilken som helst filserver også fungerer uten ekstra oppsett.
