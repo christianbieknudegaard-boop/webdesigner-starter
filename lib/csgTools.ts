@@ -297,15 +297,73 @@ export function engraveGeometry(
       : box.min.getComponent(axisIndex);
 
   const up = FACE_VECTORS[`+${options.upAxis}` as FaceSide];
-  // Extrude a bit deeper than requested so the boolean cut is unambiguous.
-  const textGeometry = buildTextGeometry(trimmed, options.size, options.depth * 2);
+  const rotation = textRotationFor(direction, up);
+
+  // The bounding-box face usually floats above the real surface on curved
+  // models. Raycast a grid over the text footprint to find how far the
+  // actual surface lies behind the face plane (dMin = most protruding
+  // sampled point, dMax = most recessed), and anchor the text prism there.
+  const probe = buildTextGeometry(trimmed, options.size, 1);
+  probe.computeBoundingBox();
+  const textSize = probe.boundingBox!.getSize(new THREE.Vector3());
+  const basis = new THREE.Matrix4().makeRotationFromQuaternion(rotation);
+  const textRight = new THREE.Vector3().setFromMatrixColumn(basis, 0);
+  const textUp = new THREE.Vector3().setFromMatrixColumn(basis, 1);
+
+  const raycaster = new THREE.Raycaster();
+  const probeMesh = new THREE.Mesh(
+    geometry,
+    new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })
+  );
+  const spanOut = box.getSize(new THREE.Vector3()).getComponent(axisIndex) || 1;
+  const pad = Math.max(spanOut * 0.05, options.depth);
+  const probeDepth = (u: number, v: number): number | null => {
+    const sample = center
+      .clone()
+      .addScaledVector(textRight, textSize.x * u)
+      .addScaledVector(textUp, textSize.y * v);
+    sample.setComponent(axisIndex, faceCoord + direction.getComponent(axisIndex) * pad);
+    raycaster.set(sample, direction.clone().negate());
+    const hit = raycaster.intersectObject(probeMesh, false)[0];
+    return hit ? hit.distance - pad : null; // 0 = at the bbox face plane
+  };
+
+  // Anchor on the surface under the text's center; the protrusion check
+  // keeps the prism from starting buried under a higher nearby feature.
+  const hits: number[] = [];
+  let dMin = Infinity;
+  for (const u of [-0.45, 0, 0.45]) {
+    for (const v of [-0.45, 0, 0.45]) {
+      const d = probeDepth(u, v);
+      if (d === null) continue;
+      hits.push(d);
+      if (d < dMin) dMin = d;
+    }
+  }
+  let anchor = probeDepth(0, 0);
+  if (anchor === null) {
+    hits.sort((a, b) => a - b);
+    anchor = hits.length > 0 ? hits[Math.floor(hits.length / 2)] : 0;
+  }
+  if (!Number.isFinite(dMin)) dMin = anchor;
+
+  const eps = options.depth * 0.25;
+  // Engrave: cut `depth` below the anchored surface, starting just proud of
+  // the highest sampled point so no buried pocket forms. Emboss: a prism
+  // centered on the anchored surface - `depth` raised, `depth` embedded.
+  const outerDepth =
+    options.mode === 'engrave' ? Math.min(dMin, anchor) - eps : anchor - options.depth;
+  const innerDepth = anchor + options.depth;
+  const textGeometry = buildTextGeometry(trimmed, options.size, innerDepth - outerDepth);
 
   const textBrush = new Brush(textGeometry);
-  textBrush.quaternion.copy(textRotationFor(direction, up));
+  textBrush.quaternion.copy(rotation);
   const position = center.clone();
-  // Engrave: sink so it protrudes `depth` inward. Emboss: raise outward.
-  const offset = options.mode === 'engrave' ? -options.depth : options.depth;
-  position.setComponent(axisIndex, faceCoord + direction.getComponent(axisIndex) * offset);
+  const centerDepth = (outerDepth + innerDepth) / 2;
+  position.setComponent(
+    axisIndex,
+    faceCoord - direction.getComponent(axisIndex) * centerDepth
+  );
   textBrush.position.copy(position);
   textBrush.updateMatrixWorld();
 
