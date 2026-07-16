@@ -5,14 +5,24 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { ensureOutwardWinding } from '@/lib/meshUtils';
-import type { ModelFormat, ModelStats } from '@/types/model';
+import { svgToGeometry, SVG_DEFAULTS } from '@/lib/svgTo3d';
+import { fileToImageData, imageToLithophane, LITHOPHANE_DEFAULTS } from '@/lib/lithophane';
+import { isZUpFormat, type ModelFormat, type ModelStats } from '@/types/model';
 
 const MODEL_COLOR = '#4f8ff7';
+
+/** Kept around for 2D-derived models so the panel can regenerate them. */
+export type Source2D =
+  | { kind: 'svg'; text: string }
+  | { kind: 'image'; image: ImageData };
 
 export interface ParsedModel {
   object: THREE.Object3D;
   stats: ModelStats;
+  source2d?: Source2D;
 }
+
+const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp']);
 
 function applyStandardMaterial(object: THREE.Object3D) {
   const material = new THREE.MeshStandardMaterial({
@@ -103,8 +113,29 @@ export async function parseModelFile(file: File): Promise<ParsedModel> {
 
   let object: THREE.Object3D;
   let format: ModelFormat;
+  let source2d: Source2D | undefined;
 
-  if (extension === 'stl') {
+  if (extension === 'svg') {
+    try {
+      const text = await file.text();
+      object = new THREE.Mesh(svgToGeometry(text, SVG_DEFAULTS));
+      format = 'svg';
+      source2d = { kind: 'svg', text };
+    } catch (err) {
+      throw err instanceof Error && err.message.startsWith('Fant ingen')
+        ? err
+        : new Error('Kunne ikke lese SVG-filen. Den må inneholde fylte former.');
+    }
+  } else if (extension && IMAGE_EXTENSIONS.has(extension)) {
+    try {
+      const image = await fileToImageData(file);
+      object = new THREE.Mesh(imageToLithophane(image, LITHOPHANE_DEFAULTS));
+      format = 'bilde';
+      source2d = { kind: 'image', image };
+    } catch {
+      throw new Error('Kunne ikke lese bildet. Prøv PNG, JPG eller WebP.');
+    }
+  } else if (extension === 'stl') {
     try {
       const buffer = await file.arrayBuffer();
       const geometry = new STLLoader().parse(buffer);
@@ -148,7 +179,7 @@ export async function parseModelFile(file: File): Promise<ParsedModel> {
     }
   } else {
     throw new Error(
-      `Filformatet .${extension ?? '?'} støttes ikke ennå. Bruk STL, OBJ, GLB eller PLY.`
+      `Filformatet .${extension ?? '?'} støttes ikke ennå. Bruk STL, OBJ, GLB, PLY, SVG eller et bilde.`
     );
   }
 
@@ -163,12 +194,11 @@ export async function parseModelFile(file: File): Promise<ParsedModel> {
   // so dimensions match what a slicer/CAD tool would report (X/Y/Z as authored).
   const stats = computeStats(object, file.name, format);
 
-  // STL and PLY are conventionally Z-up (print bed = XY, height = Z), while
-  // three.js treats Y as up. Rotate for display only so tall parts don't
-  // render lying down. OBJ and GLB are already Y-up.
-  if (format === 'stl' || format === 'ply') {
+  // Z-up formats (print bed = XY, height = Z) get a display-only rotation,
+  // since three.js treats Y as up. OBJ and GLB are already Y-up.
+  if (isZUpFormat(format)) {
     object.rotation.x = -Math.PI / 2;
   }
 
-  return { object, stats };
+  return { object, stats, source2d };
 }

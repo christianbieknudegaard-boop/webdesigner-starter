@@ -10,15 +10,18 @@ import ShellPanel from '@/components/ShellPanel';
 import RepairPanel from '@/components/RepairPanel';
 import MoldPanel from '@/components/MoldPanel';
 import RoadmapSection from '@/components/RoadmapSection';
-import { parseModelFile } from '@/lib/parseModel';
+import { parseModelFile, type Source2D } from '@/lib/parseModel';
 import { createShell } from '@/lib/shellModel';
 import type { MeshHealthReport } from '@/lib/meshRepair';
 import {
   analyzeMeshInWorker,
   runGeometryOp,
   thicknessInWorker,
+  overhangInWorker,
+  orientInWorker,
   type GeometryOpResult,
   type ThicknessClientResult,
+  type OverhangClientResult,
 } from '@/lib/meshClient';
 import OptimizePanel, { type OptimizeOp } from '@/components/OptimizePanel';
 import type { MoldOptions, SplitAxis } from '@/lib/moldGenerator';
@@ -26,17 +29,22 @@ import {
   generateMoldInWorker,
   cutInWorker,
   engraveInWorker,
+  booleanInWorker,
   type MoldClientResult,
   type CutClientResult,
 } from '@/lib/moldClient';
 import CutPanel from '@/components/CutPanel';
 import EngravePanel from '@/components/EngravePanel';
-import type { FaceSide } from '@/lib/csgTools';
+import CombinePanel, { type CombineOffset } from '@/components/CombinePanel';
+import From2DPanel from '@/components/From2DPanel';
+import type { BooleanOp, FaceSide } from '@/lib/csgTools';
+import { svgToGeometry, SVG_DEFAULTS, type SvgOptions } from '@/lib/svgTo3d';
+import { imageToLithophane, LITHOPHANE_DEFAULTS, type LithophaneOptions } from '@/lib/lithophane';
 import { analyzeDemoldability, recommendSplitAxis } from '@/lib/demoldAnalysis';
 import { downloadGeometryAsSTL, downloadGeometry } from '@/lib/exportModel';
 import { getSingleMesh, computeVolume, dominantFaceNormal, ensureOutwardWinding } from '@/lib/meshUtils';
 import TransformPanel, { type RotateAxis } from '@/components/TransformPanel';
-import type { ModelStats } from '@/types/model';
+import { formatUpAxis, isZUpFormat, type ModelStats } from '@/types/model';
 
 const ModelViewer = dynamic(() => import('@/components/ModelViewer'), { ssr: false });
 
@@ -98,7 +106,27 @@ export default function Home() {
   const [thicknessBusy, setThicknessBusy] = useState(false);
   const [showThickness, setShowThickness] = useState(false);
 
-  // Also clears the thickness heat map - it belongs to the old geometry.
+  const [overhangResult, setOverhangResult] = useState<OverhangClientResult | null>(null);
+  const [overhangBusy, setOverhangBusy] = useState(false);
+  const [showOverhang, setShowOverhang] = useState(false);
+  const [orientBusy, setOrientBusy] = useState(false);
+  const [orientStatus, setOrientStatus] = useState<string | null>(null);
+
+  // Second model for the boolean tool.
+  const [secondGeometry, setSecondGeometry] = useState<THREE.BufferGeometry | null>(null);
+  const [secondName, setSecondName] = useState<string | null>(null);
+  const [combineOffset, setCombineOffset] = useState<CombineOffset>({ x: 0, y: 0, z: 0 });
+  const [combineScale, setCombineScale] = useState(100);
+  const [combineBusy, setCombineBusy] = useState(false);
+  const [combineError, setCombineError] = useState<string | null>(null);
+
+  // 2D source (SVG text / image pixels) kept for regeneration.
+  const [source2d, setSource2d] = useState<Source2D | null>(null);
+  const [svgOptions, setSvgOptions] = useState<SvgOptions>(SVG_DEFAULTS);
+  const [lithoOptions, setLithoOptions] = useState<LithophaneOptions>(LITHOPHANE_DEFAULTS);
+  const [regenBusy, setRegenBusy] = useState(false);
+
+  // Also clears the heat maps - they belong to the old geometry.
   const resetShellState = useCallback(() => {
     setShellGeometry(null);
     setShellTriangleCount(null);
@@ -108,6 +136,19 @@ export default function Home() {
     setThicknessResult(null);
     setThicknessBusy(false);
     setShowThickness(false);
+    setOverhangResult(null);
+    setOverhangBusy(false);
+    setShowOverhang(false);
+    setOrientStatus(null);
+  }, []);
+
+  const resetCombineState = useCallback(() => {
+    setSecondGeometry(null);
+    setSecondName(null);
+    setCombineOffset({ x: 0, y: 0, z: 0 });
+    setCombineScale(100);
+    setCombineBusy(false);
+    setCombineError(null);
   }, []);
 
   const [cutResult, setCutResult] = useState<CutClientResult | null>(null);
@@ -145,10 +186,14 @@ export default function Home() {
         setMeasurePoints([]);
         resetShellState();
         resetMoldState();
+        resetCombineState();
         setRepairedCount(null);
         setOptimizeStatus(null);
         undoSnapshot.current = null;
         setCanUndo(false);
+        setSource2d(result.source2d ?? null);
+        setSvgOptions(SVG_DEFAULTS);
+        setLithoOptions(LITHOPHANE_DEFAULTS);
 
         const mesh = getSingleMesh(result.object);
         setBaseGeometry(mesh?.geometry ?? null);
@@ -170,7 +215,7 @@ export default function Home() {
         setIsLoading(false);
       }
     },
-    [resetShellState, resetMoldState]
+    [resetShellState, resetMoldState, resetCombineState]
   );
 
   const handleReset = useCallback(() => {
@@ -183,13 +228,15 @@ export default function Home() {
     setMeasurePoints([]);
     resetShellState();
     resetMoldState();
+    resetCombineState();
     setBaseGeometry(null);
     setHealth(null);
     setRepairedCount(null);
     setOptimizeStatus(null);
+    setSource2d(null);
     undoSnapshot.current = null;
     setCanUndo(false);
-  }, [resetShellState, resetMoldState]);
+  }, [resetShellState, resetMoldState, resetCombineState]);
 
   const handleScaleChange = useCallback(
     (next: number) => {
@@ -276,8 +323,8 @@ export default function Home() {
       const normal = dominantFaceNormal(geometry);
       if (!normal) return;
       const down = new THREE.Vector3();
-      // Native down: -Z for Z-up formats (STL/PLY), -Y for Y-up (OBJ/GLB).
-      if (stats?.format === 'obj' || stats?.format === 'glb') down.set(0, -1, 0);
+      // Native down: -Z for Z-up formats, -Y for Y-up (OBJ/GLB).
+      if (stats && formatUpAxis(stats.format) === 'y') down.set(0, -1, 0);
       else down.set(0, 0, -1);
       const rotation = new THREE.Quaternion().setFromUnitVectors(normal, down);
       geometry.applyQuaternion(rotation);
@@ -416,10 +463,10 @@ export default function Home() {
       panelOptions: Omit<MoldOptions, 'upAxis'>
     ) => {
       if (!baseGeometry || !(marginInCurrentUnit > 0)) return;
-      // STL is Z-up, OBJ is Y-up - the pour funnel should exit the model's top.
+      // The pour funnel should exit the model's top in its native frame.
       const options: MoldOptions = {
         ...panelOptions,
-        upAxis: stats?.format === 'obj' || stats?.format === 'glb' ? 'y' : 'z',
+        upAxis: stats ? formatUpAxis(stats.format) : 'z',
       };
 
       setIsMoldGenerating(true);
@@ -467,6 +514,7 @@ export default function Home() {
         if (analysisToken.current !== token) return;
         setThicknessResult(result);
         setShowThickness(true);
+        setShowOverhang(false);
         setShowMold(false);
         setShowCut(false);
         setMeasurePoints([]);
@@ -477,6 +525,219 @@ export default function Home() {
       }
     },
     [baseGeometry, unit, scale]
+  );
+
+  const handleCheckOverhang = useCallback(
+    async (thresholdDeg: number) => {
+      if (!baseGeometry || !stats) return;
+      setOverhangBusy(true);
+      const token = analysisToken.current;
+      try {
+        const result = await overhangInWorker(baseGeometry, thresholdDeg, formatUpAxis(stats.format));
+        if (analysisToken.current !== token) return;
+        setOverhangResult(result);
+        setShowOverhang(true);
+        setShowThickness(false);
+        setShowMold(false);
+        setShowCut(false);
+        setMeasurePoints([]);
+      } catch {
+        /* leave state untouched on failure */
+      } finally {
+        if (analysisToken.current === token) setOverhangBusy(false);
+      }
+    },
+    [baseGeometry, stats]
+  );
+
+  const handleAutoOrient = useCallback(async () => {
+    if (!baseGeometry || !stats) return;
+    setOrientBusy(true);
+    const token = analysisToken.current;
+    try {
+      const suggestion = await orientInWorker(baseGeometry, 45, formatUpAxis(stats.format));
+      if (analysisToken.current !== token) return;
+      const current = (suggestion.currentFraction * 100).toFixed(1);
+      const best = (suggestion.bestFraction * 100).toFixed(1);
+      if (suggestion.currentFraction - suggestion.bestFraction < 0.005) {
+        setOrientStatus(`Allerede godt orientert – ${current} % trenger støtte.`);
+      } else {
+        const [x, y, z, w] = suggestion.quaternion;
+        const rotation = new THREE.Quaternion(x, y, z, w);
+        // applyTransform clears orientStatus via resetShellState; set after.
+        applyTransform((geometry) => geometry.applyQuaternion(rotation));
+        setOrientStatus(`Snudd: støttebehov ${current} % → ${best} %.`);
+      }
+    } catch {
+      setOrientStatus('Orienteringsanalysen feilet.');
+    } finally {
+      setOrientBusy(false);
+    }
+  }, [baseGeometry, stats, applyTransform]);
+
+  const handleUploadSecond = useCallback(
+    async (file: File) => {
+      if (!stats) return;
+      setCombineError(null);
+      try {
+        const parsed = await parseModelFile(file);
+        const mesh = getSingleMesh(parsed.object);
+        if (!mesh) throw new Error('Fant ingen brukbar geometri i filen.');
+        const geometry = mesh.geometry.clone();
+        // Align B's native up axis with the base model's frame.
+        const baseUp = formatUpAxis(stats.format);
+        const secondUp = formatUpAxis(parsed.stats.format);
+        if (baseUp !== secondUp) {
+          if (secondUp === 'y') geometry.rotateX(Math.PI / 2); // Y-up -> Z-up
+          else geometry.rotateX(-Math.PI / 2); // Z-up -> Y-up
+        }
+        geometry.computeBoundingBox();
+        setSecondGeometry(geometry);
+        setSecondName(parsed.stats.fileName);
+        setCombineOffset({ x: 0, y: 0, z: 0 });
+        setCombineScale(100);
+      } catch (err) {
+        setCombineError(err instanceof Error ? err.message : 'Kunne ikke lese filen.');
+      }
+    },
+    [stats]
+  );
+
+  /** Placement of model B in the base model's native frame:
+   *  world = position + scale * local. Offsets are entered in mm. */
+  const combinePlacement = useMemo(() => {
+    if (!secondGeometry || !baseGeometry) return null;
+    baseGeometry.computeBoundingBox();
+    secondGeometry.computeBoundingBox();
+    const baseCenter = baseGeometry.boundingBox!.getCenter(new THREE.Vector3());
+    const secondCenter = secondGeometry.boundingBox!.getCenter(new THREE.Vector3());
+    const factor = combineScale / 100;
+    const offsetNative = new THREE.Vector3(combineOffset.x, combineOffset.y, combineOffset.z)
+      .divideScalar(scale);
+    const position = baseCenter
+      .clone()
+      .add(offsetNative)
+      .sub(secondCenter.clone().multiplyScalar(factor));
+    return { position, factor };
+  }, [secondGeometry, baseGeometry, combineOffset, combineScale, scale]);
+
+  const handleApplyCombine = useCallback(
+    async (op: BooleanOp) => {
+      if (!baseGeometry || !secondGeometry || !combinePlacement || !stats) return;
+      setCombineBusy(true);
+      setCombineError(null);
+      const token = ++analysisToken.current;
+      try {
+        const placed = secondGeometry.clone();
+        placed.scale(combinePlacement.factor, combinePlacement.factor, combinePlacement.factor);
+        placed.translate(
+          combinePlacement.position.x,
+          combinePlacement.position.y,
+          combinePlacement.position.z
+        );
+        const result = await booleanInWorker(baseGeometry, placed, op);
+        if (analysisToken.current !== token) return;
+        rememberForUndo(baseGeometry, stats, health);
+        result.computeBoundingBox();
+        const size = result.boundingBox!.getSize(new THREE.Vector3());
+        const triangleCount = result.index
+          ? result.index.count / 3
+          : result.attributes.position.count / 3;
+        setBaseGeometry(result);
+        setStats((prev) =>
+          prev
+            ? {
+                ...prev,
+                triangleCount: Math.round(triangleCount),
+                vertexCount: result.attributes.position.count,
+                dimensions: { x: size.x, y: size.y, z: size.z },
+              }
+            : prev
+        );
+        setHealth(null);
+        analyzeMeshInWorker(result)
+          .then((report) => {
+            if (analysisToken.current === token) setHealth(report);
+          })
+          .catch(() => {});
+        resetShellState();
+        resetMoldState();
+        resetCombineState();
+        setMeasurePoints([]);
+      } catch (err) {
+        if (analysisToken.current === token) {
+          setCombineError(err instanceof Error ? err.message : 'Kombineringen feilet.');
+          setCombineBusy(false);
+        }
+      }
+    },
+    [baseGeometry, secondGeometry, combinePlacement, stats, health, rememberForUndo, resetShellState, resetMoldState, resetCombineState]
+  );
+
+  /** Swaps in a freshly generated 2D-derived geometry (SVG/lithophane). */
+  const regenerateFrom2D = useCallback(
+    (build: () => THREE.BufferGeometry) => {
+      if (!stats) return;
+      setRegenBusy(true);
+      setError(null);
+      // Defer so the busy state paints before the synchronous mesh build.
+      setTimeout(() => {
+        try {
+          const geometry = build();
+          analysisToken.current++;
+          const token = analysisToken.current;
+          rememberForUndo(baseGeometry, stats, health);
+          geometry.computeBoundingBox();
+          const size = geometry.boundingBox!.getSize(new THREE.Vector3());
+          const triangleCount = geometry.index
+            ? geometry.index.count / 3
+            : geometry.attributes.position.count / 3;
+          setBaseGeometry(geometry);
+          setStats((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  triangleCount: Math.round(triangleCount),
+                  vertexCount: geometry.attributes.position.count,
+                  dimensions: { x: size.x, y: size.y, z: size.z },
+                }
+              : prev
+          );
+          setHealth(null);
+          analyzeMeshInWorker(geometry)
+            .then((report) => {
+              if (analysisToken.current === token) setHealth(report);
+            })
+            .catch(() => {});
+          resetShellState();
+          resetMoldState();
+          setMeasurePoints([]);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Kunne ikke oppdatere modellen.');
+        } finally {
+          setRegenBusy(false);
+        }
+      }, 20);
+    },
+    [baseGeometry, stats, health, rememberForUndo, resetShellState, resetMoldState]
+  );
+
+  const handleRegenerateSvg = useCallback(
+    (options: SvgOptions) => {
+      if (source2d?.kind !== 'svg') return;
+      setSvgOptions(options);
+      regenerateFrom2D(() => svgToGeometry(source2d.text, options));
+    },
+    [source2d, regenerateFrom2D]
+  );
+
+  const handleRegenerateLitho = useCallback(
+    (options: LithophaneOptions) => {
+      if (source2d?.kind !== 'image') return;
+      setLithoOptions(options);
+      regenerateFrom2D(() => imageToLithophane(source2d.image, options));
+    },
+    [source2d, regenerateFrom2D]
   );
 
   const handleCut = useCallback(
@@ -540,7 +801,7 @@ export default function Home() {
           size: toNative(sizeInUnit),
           depth: toNative(depthInUnit),
           mode,
-          upAxis: stats?.format === 'obj' || stats?.format === 'glb' ? 'y' : 'z',
+          upAxis: stats ? formatUpAxis(stats.format) : 'z',
         });
         if (analysisToken.current !== token) return;
         rememberForUndo(baseGeometry, stats, health);
@@ -605,7 +866,7 @@ export default function Home() {
 
     const group = new THREE.Group();
     group.add(meshA, meshB);
-    if (stats?.format === 'stl' || stats?.format === 'ply') {
+    if (stats && isZUpFormat(stats.format)) {
       group.rotation.x = -Math.PI / 2;
     }
     return group;
@@ -639,7 +900,7 @@ export default function Home() {
 
     const group = new THREE.Group();
     group.add(meshA, meshB);
-    if (stats?.format === 'stl' || stats?.format === 'ply') {
+    if (stats && isZUpFormat(stats.format)) {
       group.rotation.x = -Math.PI / 2;
     }
     return group;
@@ -662,6 +923,38 @@ export default function Home() {
       mesh.rotation.copy(object.rotation);
       return mesh;
     }
+    if (showOverhang && overhangResult) {
+      const mesh = new THREE.Mesh(
+        overhangResult.geometry,
+        new THREE.MeshStandardMaterial({
+          vertexColors: true,
+          roughness: 0.55,
+          metalness: 0.05,
+          side: THREE.DoubleSide,
+        })
+      );
+      mesh.rotation.copy(object.rotation);
+      return mesh;
+    }
+    if (secondGeometry && combinePlacement) {
+      const group = new THREE.Group();
+      const baseMesh = new THREE.Mesh(baseGeometry ?? singleMesh.geometry, singleMesh.material);
+      const secondMesh = new THREE.Mesh(
+        secondGeometry,
+        new THREE.MeshStandardMaterial({
+          color: '#f59e0b',
+          roughness: 0.4,
+          transparent: true,
+          opacity: 0.75,
+          side: THREE.DoubleSide,
+        })
+      );
+      secondMesh.scale.setScalar(combinePlacement.factor);
+      secondMesh.position.copy(combinePlacement.position);
+      group.add(baseMesh, secondMesh);
+      group.rotation.copy(object.rotation);
+      return group;
+    }
     if (isHollow && shellGeometry) {
       const mesh = new THREE.Mesh(shellGeometry, singleMesh.material);
       mesh.rotation.copy(object.rotation);
@@ -673,7 +966,7 @@ export default function Home() {
       return mesh;
     }
     return object;
-  }, [showMold, moldDisplayObject, showCut, cutDisplayObject, showThickness, thicknessResult, object, singleMesh, isHollow, shellGeometry, baseGeometry]);
+  }, [showMold, moldDisplayObject, showCut, cutDisplayObject, showThickness, thicknessResult, showOverhang, overhangResult, secondGeometry, combinePlacement, object, singleMesh, isHollow, shellGeometry, baseGeometry]);
 
   const distance =
     measurePoints.length === 2 ? measurePoints[0].distanceTo(measurePoints[1]) : null;
@@ -760,11 +1053,24 @@ export default function Home() {
                   onUndo={handleUndo}
                   onReset={handleReset}
                 />
+                {source2d && (
+                  <From2DPanel
+                    source={source2d}
+                    svgOptions={svgOptions}
+                    lithoOptions={lithoOptions}
+                    busy={regenBusy}
+                    onRegenerateSvg={handleRegenerateSvg}
+                    onRegenerateLitho={handleRegenerateLitho}
+                  />
+                )}
                 <TransformPanel
                   supported={singleMesh !== null}
+                  orientBusy={orientBusy}
+                  orientStatus={orientStatus}
                   onRotate={handleRotate}
                   onMirror={handleMirror}
                   onLayFlat={handleLayFlat}
+                  onAutoOrient={handleAutoOrient}
                 />
                 <RepairPanel
                   supported={singleMesh !== null}
@@ -775,9 +1081,14 @@ export default function Home() {
                   thicknessBusy={thicknessBusy}
                   thicknessInfo={thicknessResult}
                   showThickness={showThickness}
+                  overhangBusy={overhangBusy}
+                  overhangInfo={overhangResult}
+                  showOverhang={showOverhang}
                   onRepair={handleRepair}
                   onCheckThickness={handleCheckThickness}
                   onToggleShowThickness={() => setShowThickness((prev) => !prev)}
+                  onCheckOverhang={handleCheckOverhang}
+                  onToggleShowOverhang={() => setShowOverhang((prev) => !prev)}
                 />
                 <OptimizePanel
                   supported={singleMesh !== null}
@@ -840,6 +1151,29 @@ export default function Home() {
                   isEngraving={isEngraving}
                   error={engraveError}
                   onEngrave={handleEngrave}
+                />
+                <CombinePanel
+                  supported={singleMesh !== null}
+                  unit={unit}
+                  secondName={secondName}
+                  secondTriangles={
+                    secondGeometry
+                      ? Math.round(
+                          (secondGeometry.index
+                            ? secondGeometry.index.count
+                            : secondGeometry.attributes.position.count) / 3
+                        )
+                      : null
+                  }
+                  offset={combineOffset}
+                  scalePercent={combineScale}
+                  busy={combineBusy}
+                  error={combineError}
+                  onUploadSecond={handleUploadSecond}
+                  onOffsetChange={setCombineOffset}
+                  onScalePercentChange={setCombineScale}
+                  onApply={handleApplyCombine}
+                  onClearSecond={resetCombineState}
                 />
               </aside>
             </>

@@ -31,6 +31,31 @@ function bakeResult(brush: Brush): THREE.BufferGeometry {
   return brush.geometry;
 }
 
+export type BooleanOp = 'union' | 'subtract' | 'intersect';
+
+/** Combines two solids with a boolean operation. Both inputs must already be
+ *  in the same coordinate frame; the result is baked into that frame. */
+export function booleanGeometry(
+  a: THREE.BufferGeometry,
+  b: THREE.BufferGeometry,
+  op: BooleanOp
+): THREE.BufferGeometry {
+  const prepare = (source: THREE.BufferGeometry) => {
+    const clone = source.clone();
+    if (!clone.attributes.normal) clone.computeVertexNormals();
+    const brush = new Brush(clone);
+    brush.updateMatrixWorld();
+    return brush;
+  };
+  const operation = op === 'union' ? ADDITION : op === 'subtract' ? SUBTRACTION : INTERSECTION;
+  const result = makeEvaluator().evaluate(prepare(a), prepare(b), operation);
+  const geometry = bakeResult(result);
+  if (!geometry.attributes.position || geometry.attributes.position.count === 0) {
+    throw new Error('Operasjonen ga et tomt resultat – modellene overlapper kanskje ikke.');
+  }
+  return geometry;
+}
+
 export interface CutResult {
   halfA: THREE.BufferGeometry;
   halfB: THREE.BufferGeometry;

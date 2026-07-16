@@ -1,6 +1,12 @@
 import * as THREE from 'three';
 import type { MeshHealthReport } from '@/lib/meshRepair';
-import type { MeshWorkerOp, MeshWorkerRequest, MeshWorkerResponse } from '@/lib/meshWorker';
+import type {
+  MeshAnalysisOp,
+  MeshWorkerOp,
+  MeshWorkerRequest,
+  MeshWorkerResponse,
+} from '@/lib/meshWorker';
+import type { OrientationSuggestion, UpAxis } from '@/lib/overhang';
 
 export interface GeometryOpResult {
   geometry: THREE.BufferGeometry;
@@ -83,16 +89,61 @@ export async function thicknessInWorker(
   };
 }
 
+export interface OverhangClientResult {
+  /** Geometry with a per-face support heat map (red = needs support). */
+  geometry: THREE.BufferGeometry;
+  supportFraction: number;
+}
+
+/** Colors faces that need print support at the given threshold (degrees
+ *  from vertical) in the worker. */
+export async function overhangInWorker(
+  geometry: THREE.BufferGeometry,
+  thresholdDeg: number,
+  up: UpAxis
+): Promise<OverhangClientResult> {
+  const { positions, index } = extract(geometry);
+  const response = await runMeshWorker({ op: 'overhang', positions, index, amount: thresholdDeg, up });
+  if (response.op !== 'overhang') throw new Error('Uventet svar fra overhengsanalysen.');
+
+  const rebuilt = new THREE.BufferGeometry();
+  rebuilt.setAttribute('position', new THREE.BufferAttribute(response.positions, 3));
+  rebuilt.setAttribute('color', new THREE.BufferAttribute(response.colors, 3));
+  rebuilt.computeVertexNormals();
+  return { geometry: rebuilt, supportFraction: response.supportFraction };
+}
+
+/** Finds the axis-aligned orientation with the least support-needing area. */
+export async function orientInWorker(
+  geometry: THREE.BufferGeometry,
+  thresholdDeg: number,
+  up: UpAxis
+): Promise<OrientationSuggestion> {
+  const { positions, index } = extract(geometry);
+  const response = await runMeshWorker({ op: 'orient', positions, index, amount: thresholdDeg, up });
+  if (response.op !== 'orient') throw new Error('Uventet svar fra orienteringsanalysen.');
+  return {
+    quaternion: response.quaternion,
+    bestFraction: response.bestFraction,
+    currentFraction: response.currentFraction,
+  };
+}
+
 /** Runs a geometry-transforming op (repair/simplify/loose/smooth) in the
  *  worker and rebuilds the resulting geometry with fresh normals. */
 export async function runGeometryOp(
   geometry: THREE.BufferGeometry,
-  op: Exclude<MeshWorkerOp, 'analyze' | 'thickness'>,
+  op: Exclude<MeshWorkerOp, MeshAnalysisOp>,
   amount?: number
 ): Promise<GeometryOpResult> {
   const { positions, index } = extract(geometry);
   const response = await runMeshWorker({ op, positions, index, amount });
-  if (response.op === 'analyze' || response.op === 'thickness')
+  if (
+    response.op === 'analyze' ||
+    response.op === 'thickness' ||
+    response.op === 'overhang' ||
+    response.op === 'orient'
+  )
     throw new Error('Uventet svar fra meshoperasjonen.');
 
   const rebuilt = new THREE.BufferGeometry();

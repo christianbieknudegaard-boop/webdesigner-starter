@@ -3,15 +3,29 @@ import * as THREE from 'three';
 import { analyzeMesh, repairMesh, type MeshHealthReport } from '@/lib/meshRepair';
 import { simplifyGeometry, removeLooseParts, smoothGeometry } from '@/lib/meshOptimize';
 import { analyzeThickness } from '@/lib/thickness';
+import { analyzeOverhang, bestPrintOrientation, type UpAxis } from '@/lib/overhang';
 
-export type MeshWorkerOp = 'analyze' | 'repair' | 'simplify' | 'loose' | 'smooth' | 'thickness';
+export type MeshWorkerOp =
+  | 'analyze'
+  | 'repair'
+  | 'simplify'
+  | 'loose'
+  | 'smooth'
+  | 'thickness'
+  | 'overhang'
+  | 'orient';
+
+/** Ops that only analyze/annotate rather than transform the geometry. */
+export type MeshAnalysisOp = 'analyze' | 'thickness' | 'overhang' | 'orient';
 
 export interface MeshWorkerRequest {
   op: MeshWorkerOp;
   positions: Float32Array;
   index: Uint32Array | null;
-  /** simplify: target triangle ratio 0..1; smooth: iteration count. */
+  /** simplify: ratio 0..1; smooth: iterations; thickness: min; overhang/orient: threshold deg. */
   amount?: number;
+  /** overhang/orient: which native axis points up. */
+  up?: UpAxis;
 }
 
 export type MeshWorkerResponse =
@@ -27,7 +41,21 @@ export type MeshWorkerResponse =
     }
   | {
       ok: true;
-      op: Exclude<MeshWorkerOp, 'analyze' | 'thickness'>;
+      op: 'overhang';
+      positions: Float32Array;
+      colors: Float32Array;
+      supportFraction: number;
+    }
+  | {
+      ok: true;
+      op: 'orient';
+      quaternion: [number, number, number, number];
+      bestFraction: number;
+      currentFraction: number;
+    }
+  | {
+      ok: true;
+      op: Exclude<MeshWorkerOp, MeshAnalysisOp>;
       report: MeshHealthReport;
       positions: Float32Array;
       index: Uint32Array | null;
@@ -45,7 +73,7 @@ function buildGeometry(positions: Float32Array, index: Uint32Array | null): THRE
 }
 
 function respondWithGeometry(
-  op: Exclude<MeshWorkerOp, 'analyze' | 'thickness'>,
+  op: Exclude<MeshWorkerOp, MeshAnalysisOp>,
   geometry: THREE.BufferGeometry,
   detail: number
 ) {
@@ -69,7 +97,7 @@ function respondWithGeometry(
 
 self.onmessage = async (event: MessageEvent<MeshWorkerRequest>) => {
   try {
-    const { op, positions, index, amount } = event.data;
+    const { op, positions, index, amount, up } = event.data;
     const geometry = buildGeometry(positions, index);
 
     if (op === 'analyze') {
@@ -107,6 +135,30 @@ self.onmessage = async (event: MessageEvent<MeshWorkerRequest>) => {
       ];
       if (outIndex) transfer.push(outIndex.buffer as ArrayBuffer);
       self.postMessage(response, { transfer });
+      return;
+    }
+
+    if (op === 'overhang') {
+      const result = analyzeOverhang(geometry, amount ?? 45, up ?? 'z');
+      const outPositions = new Float32Array(result.geometry.attributes.position.array);
+      const colors = new Float32Array(result.geometry.attributes.color.array);
+      const response: MeshWorkerResponse = {
+        ok: true,
+        op,
+        positions: outPositions,
+        colors,
+        supportFraction: result.supportFraction,
+      };
+      self.postMessage(response, {
+        transfer: [outPositions.buffer as ArrayBuffer, colors.buffer as ArrayBuffer],
+      });
+      return;
+    }
+
+    if (op === 'orient') {
+      const result = bestPrintOrientation(geometry, amount ?? 45, up ?? 'z');
+      const response: MeshWorkerResponse = { ok: true, op, ...result };
+      self.postMessage(response);
       return;
     }
 

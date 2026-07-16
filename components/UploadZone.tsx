@@ -3,8 +3,8 @@
 import { useCallback, useRef, useState } from 'react';
 import { UploadIcon } from './icons';
 
-const ACCEPTED_EXTENSIONS = ['.stl', '.obj', '.glb', '.gltf', '.ply'];
-const FORMAT_LABELS = ['STL', 'OBJ', 'GLB', 'PLY'];
+const ACCEPTED_EXTENSIONS = ['.stl', '.obj', '.glb', '.gltf', '.ply', '.svg', '.png', '.jpg', '.jpeg', '.webp'];
+const FORMAT_LABELS = ['STL', 'OBJ', 'GLB', 'PLY', 'SVG', 'BILDE'];
 
 interface UploadZoneProps {
   onFile: (file: File) => void;
@@ -53,7 +53,7 @@ export default function UploadZone({ onFile, isLoading, error }: UploadZoneProps
         <input
           ref={inputRef}
           type="file"
-          accept=".stl,.obj,.glb,.gltf,.ply"
+          accept=".stl,.obj,.glb,.gltf,.ply,.svg,.png,.jpg,.jpeg,.webp"
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}
         />
@@ -63,7 +63,10 @@ export default function UploadZone({ onFile, isLoading, error }: UploadZoneProps
         <p className="text-lg font-medium text-slate-100">
           {isLoading ? 'Leser modell…' : 'Slipp en 3D-fil her'}
         </p>
-        <p className="text-sm text-slate-400">eller klikk for å velge en fil fra maskinen din</p>
+        <p className="text-sm text-slate-400">
+          eller klikk for å velge en fil – en SVG blir til en 3D-logo, et foto blir til
+          lithophane
+        </p>
         <div className="mt-1 flex gap-1.5 font-mono text-[10px] tracking-wide text-slate-500">
           {FORMAT_LABELS.map((format) => (
             <span key={format} className="rounded border border-slate-700 px-1.5 py-0.5">
