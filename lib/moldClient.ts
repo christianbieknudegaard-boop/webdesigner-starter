@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { MoldOptions, MoldResult, SplitAxis } from '@/lib/moldGenerator';
-import type { EngraveOptions } from '@/lib/csgTools';
+import type { BooleanOp, EngraveOptions } from '@/lib/csgTools';
 import type { MoldWorkerRequest, MoldWorkerResponse } from '@/lib/moldWorker';
 
 export interface MoldClientResult extends MoldResult {
@@ -89,6 +89,44 @@ export async function cutInWorker(
     halfB: rebuildGeometry(response.halfB),
     axis: response.axis,
   };
+}
+
+/** Combines two solids (in the same native frame) with a boolean op. */
+export async function booleanInWorker(
+  geometryA: THREE.BufferGeometry,
+  geometryB: THREE.BufferGeometry,
+  op: BooleanOp
+): Promise<THREE.BufferGeometry> {
+  const a = extract(geometryA);
+  const b = extract(geometryB);
+  const request: MoldWorkerRequest = {
+    kind: 'boolean',
+    positions: a.positions,
+    index: a.index,
+    positionsB: b.positions,
+    indexB: b.index,
+    op,
+  };
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL('./moldWorker.ts', import.meta.url));
+    worker.onmessage = (event: MessageEvent<MoldWorkerResponse>) => {
+      worker.terminate();
+      if (!event.data.ok) reject(new Error(event.data.message));
+      else if (event.data.kind !== 'boolean') reject(new Error('Uventet svar fra CSG-workeren.'));
+      else resolve(rebuildGeometry(event.data.result));
+    };
+    worker.onerror = () => {
+      worker.terminate();
+      reject(new Error('CSG-operasjonen feilet i bakgrunnstråden.'));
+    };
+    const transfer: ArrayBuffer[] = [
+      a.positions.buffer as ArrayBuffer,
+      b.positions.buffer as ArrayBuffer,
+    ];
+    if (a.index) transfer.push(a.index.buffer as ArrayBuffer);
+    if (b.index) transfer.push(b.index.buffer as ArrayBuffer);
+    worker.postMessage(request, transfer);
+  });
 }
 
 export async function engraveInWorker(

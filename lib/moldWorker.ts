@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 import * as THREE from 'three';
 import { generateMold, type MoldOptions, type SplitAxis } from '@/lib/moldGenerator';
-import { cutGeometry, engraveGeometry, type EngraveOptions } from '@/lib/csgTools';
+import { booleanGeometry, cutGeometry, engraveGeometry, type EngraveOptions } from '@/lib/csgTools';
 
 export type MoldWorkerRequest =
   | {
@@ -25,6 +25,14 @@ export type MoldWorkerRequest =
       positions: Float32Array;
       index: Uint32Array | null;
       options: EngraveOptions;
+    }
+  | {
+      kind: 'boolean';
+      positions: Float32Array;
+      index: Uint32Array | null;
+      positionsB: Float32Array;
+      indexB: Uint32Array | null;
+      op: 'union' | 'subtract' | 'intersect';
     };
 
 interface GeometryPayload {
@@ -44,6 +52,7 @@ export type MoldWorkerResponse =
     }
   | { ok: true; kind: 'cut'; halfA: GeometryPayload; halfB: GeometryPayload; axis: SplitAxis }
   | { ok: true; kind: 'engrave'; result: GeometryPayload }
+  | { ok: true; kind: 'boolean'; result: GeometryPayload }
   | { ok: false; message: string };
 
 function buildGeometry(payload: GeometryPayload): THREE.BufferGeometry {
@@ -104,6 +113,14 @@ self.onmessage = (event: MessageEvent<MoldWorkerRequest>) => {
         axis: result.axis,
       };
       self.postMessage(response, { transfer: transferListOf(halfA, halfB) });
+      return;
+    }
+
+    if (request.kind === 'boolean') {
+      const geometryB = buildGeometry({ positions: request.positionsB, index: request.indexB });
+      const result = extract(booleanGeometry(geometry, geometryB, request.op));
+      const response: MoldWorkerResponse = { ok: true, kind: 'boolean', result };
+      self.postMessage(response, { transfer: transferListOf(result) });
       return;
     }
 

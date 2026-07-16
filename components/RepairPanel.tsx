@@ -15,9 +15,14 @@ interface RepairPanelProps {
   thicknessBusy: boolean;
   thicknessInfo: { belowFraction: number } | null;
   showThickness: boolean;
+  overhangBusy: boolean;
+  overhangInfo: { supportFraction: number } | null;
+  showOverhang: boolean;
   onRepair: () => void;
   onCheckThickness: (minInUnit: number) => void;
   onToggleShowThickness: () => void;
+  onCheckOverhang: (thresholdDeg: number) => void;
+  onToggleShowOverhang: () => void;
 }
 
 export default function RepairPanel({
@@ -29,11 +34,17 @@ export default function RepairPanel({
   thicknessBusy,
   thicknessInfo,
   showThickness,
+  overhangBusy,
+  overhangInfo,
+  showOverhang,
   onRepair,
   onCheckThickness,
   onToggleShowThickness,
+  onCheckOverhang,
+  onToggleShowOverhang,
 }: RepairPanelProps) {
   const [minThickness, setMinThickness] = useState(unit === 'mm' ? 2 : 0.08);
+  const [overhangDeg, setOverhangDeg] = useState(45);
 
   const [lastUnit, setLastUnit] = useState(unit);
   if (unit !== lastUnit) {
@@ -139,6 +150,50 @@ export default function RepairPanel({
                   className="w-full rounded-md border border-slate-600 py-1.5 text-slate-200 hover:border-slate-400"
                 >
                   {showThickness ? 'Skjul tykkelseskart' : 'Vis tykkelseskart'}
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-3 border-t border-slate-800 pt-3">
+            <div className="flex items-center justify-between gap-2 text-xs">
+              <label htmlFor="overhang-deg" className="text-slate-400">
+                Maks overheng (grader)
+              </label>
+              <input
+                id="overhang-deg"
+                type="number"
+                min="10"
+                max="85"
+                step="5"
+                value={overhangDeg}
+                onChange={(e) => setOverhangDeg(parseFloat(e.target.value))}
+                className="w-20 rounded-md border border-slate-700 bg-slate-800/80 px-2 py-1 text-right text-slate-100"
+              />
+            </div>
+            <button
+              onClick={() => onCheckOverhang(overhangDeg)}
+              disabled={overhangBusy || !(overhangDeg > 0 && overhangDeg < 90)}
+              className="mt-2 w-full rounded-md border border-slate-600 py-1.5 text-xs text-slate-200 hover:border-slate-400 disabled:opacity-50"
+            >
+              {overhangBusy ? 'Analyserer…' : 'Sjekk overheng (printstøtte)'}
+            </button>
+            {overhangInfo && (
+              <div className="mt-2 space-y-1.5 text-xs">
+                <p
+                  className={
+                    overhangInfo.supportFraction > 0.001 ? 'text-amber-300' : 'text-emerald-300'
+                  }
+                >
+                  {overhangInfo.supportFraction > 0.001
+                    ? `⚠ ${(overhangInfo.supportFraction * 100).toFixed(1)} % av flaten trenger støtte`
+                    : '✓ Kan printes uten støtte i denne retningen'}
+                </p>
+                <button
+                  onClick={onToggleShowOverhang}
+                  className="w-full rounded-md border border-slate-600 py-1.5 text-slate-200 hover:border-slate-400"
+                >
+                  {showOverhang ? 'Skjul overhengskart' : 'Vis overhengskart'}
                 </button>
               </div>
             )}

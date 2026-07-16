@@ -106,6 +106,47 @@ export function ThicknessIcon({ className }: IconProps) {
   );
 }
 
+export function CombineIcon({ className }: IconProps) {
+  return (
+    <svg {...base(className)}>
+      <rect x="3.5" y="3.5" width="12" height="12" rx="2" />
+      <path d="M20.5 12.5v6a2 2 0 0 1-2 2h-6a2 2 0 0 1-2-2v-2" />
+      <path d="M15.5 8.5h3a2 2 0 0 1 2 2v2" strokeDasharray="2 2" />
+    </svg>
+  );
+}
+
+export function OverhangIcon({ className }: IconProps) {
+  return (
+    <svg {...base(className)}>
+      <path d="M5 20V4h6l8 10v6" />
+      <path d="M12.5 9.5 5 17M15.5 13.5 8 21" strokeDasharray="2 2" />
+    </svg>
+  );
+}
+
+export function LithophaneIcon({ className }: IconProps) {
+  return (
+    <svg {...base(className)}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <circle cx="9" cy="9.5" r="1.6" />
+      <path d="m3.5 17 5-5 4 4 3.5-3.5 4.5 4.5" />
+    </svg>
+  );
+}
+
+export function VectorIcon({ className }: IconProps) {
+  return (
+    <svg {...base(className)}>
+      <path d="M4 18c5-11 11-11 16 0" />
+      <rect x="2.5" y="16.5" width="3" height="3" />
+      <rect x="18.5" y="16.5" width="3" height="3" />
+      <path d="M7 7h10" strokeDasharray="2 2" />
+      <circle cx="12" cy="7" r="1.4" />
+    </svg>
+  );
+}
+
 export function RotateIcon({ className }: IconProps) {
   return (
     <svg {...base(className)}>

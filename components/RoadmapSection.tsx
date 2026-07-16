@@ -1,12 +1,16 @@
 import {
+  CombineIcon,
   CutIcon,
   EngraveIcon,
+  LithophaneIcon,
   MoldIcon,
   OptimizeIcon,
+  OverhangIcon,
   RepairIcon,
   RulerIcon,
   ShellIcon,
   ThicknessIcon,
+  VectorIcon,
 } from './icons';
 
 const TOOLS = [
@@ -49,6 +53,26 @@ const TOOLS = [
     icon: ThicknessIcon,
     title: 'Veggtykkelse',
     description: 'Fargekart som avslører områder som er for tynne for print eller støp.',
+  },
+  {
+    icon: CombineIcon,
+    title: 'Kombiner modeller',
+    description: 'Slå sammen to modeller, trekk den ene fra den andre, eller behold bare overlappen.',
+  },
+  {
+    icon: OverhangIcon,
+    title: 'Overheng-analyse',
+    description: 'Se hvilke flater som trenger printstøtte, og auto-orienter for minst mulig støtte.',
+  },
+  {
+    icon: LithophaneIcon,
+    title: 'Foto til lithophane',
+    description: 'Last opp et bilde og få en printbar relieffplate som viser motivet med lys bak.',
+  },
+  {
+    icon: VectorIcon,
+    title: 'SVG til 3D',
+    description: 'Ekstruder en logo eller et ikon fra SVG til en solid modell med valgfri høyde.',
   },
 ] as const;
 
