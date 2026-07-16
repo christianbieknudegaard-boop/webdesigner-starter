@@ -622,6 +622,11 @@ export default function Home() {
         const result = await cutInWorker(baseGeometry, upAxis, coord, false);
         if (analysisToken.current !== token) return;
         const kept = result.halfA;
+        // Drop the model back down so the new flat base sits where the old
+        // bottom was, instead of floating at the cut level.
+        const drop = new THREE.Vector3();
+        drop.setComponent(axisIndex, -heightNative);
+        kept.translate(drop.x, drop.y, drop.z);
         rememberForUndo(baseGeometry, stats, health);
         kept.computeBoundingBox();
         const size = kept.boundingBox!.getSize(new THREE.Vector3());
@@ -1139,6 +1144,7 @@ export default function Home() {
                 />
                 {source2d && (
                   <From2DPanel
+                    key={stats.fileName}
                     source={source2d}
                     svgOptions={svgOptions}
                     lithoOptions={lithoOptions}
