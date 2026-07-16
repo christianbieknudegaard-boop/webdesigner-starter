@@ -3,7 +3,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { UploadIcon } from './icons';
 
-const ACCEPTED_EXTENSIONS = ['.stl', '.obj', '.glb', '.gltf', '.ply', '.svg', '.png', '.jpg', '.jpeg', '.webp'];
 const FORMAT_LABELS = ['STL', 'OBJ', 'GLB', 'PLY', 'SVG', 'BILDE'];
 
 interface UploadZoneProps {
@@ -19,10 +18,9 @@ export default function UploadZone({ onFile, isLoading, error }: UploadZoneProps
   const handleFiles = useCallback(
     (files: FileList | null) => {
       const file = files?.[0];
-      if (!file) return;
-      const extension = `.${file.name.split('.').pop()?.toLowerCase()}`;
-      if (!ACCEPTED_EXTENSIONS.includes(extension)) return;
-      onFile(file);
+      // No extension filtering here: unsupported files get a clear error
+      // message from the parser instead of being silently ignored.
+      if (file) onFile(file);
     },
     [onFile]
   );
@@ -50,12 +48,16 @@ export default function UploadZone({ onFile, isLoading, error }: UploadZoneProps
             : 'border-slate-600 bg-slate-900/60 hover:border-slate-400'
         }`}
       >
+        {/* No `accept` filter: several OS file pickers (notably iOS) don't
+            recognize .stl/.obj as types and would gray the files out. */}
         <input
           ref={inputRef}
           type="file"
-          accept=".stl,.obj,.glb,.gltf,.ply,.svg,.png,.jpg,.jpeg,.webp"
           className="hidden"
-          onChange={(e) => handleFiles(e.target.files)}
+          onChange={(e) => {
+            handleFiles(e.target.files);
+            e.target.value = '';
+          }}
         />
         <span className="flex h-12 w-12 items-center justify-center rounded-lg border border-slate-600 text-slate-300">
           <UploadIcon className="h-6 w-6" />

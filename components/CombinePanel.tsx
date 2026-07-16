@@ -82,7 +82,6 @@ export default function CombinePanel({
           <input
             ref={inputRef}
             type="file"
-            accept=".stl,.obj,.glb,.gltf,.ply"
             className="hidden"
             onChange={(e) => {
               const file = e.target.files?.[0];
