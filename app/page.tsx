@@ -699,7 +699,9 @@ export default function Home() {
               <p className="text-[11px] text-slate-500">3D-verktøy for makere og modellbyggere</p>
             </div>
           </div>
-          <span className="tlabel rounded-full border border-slate-700 px-3 py-1">STL · OBJ · GLB · PLY</span>
+          <span className="hidden font-mono text-[10px] tracking-[0.25em] text-slate-500 uppercase sm:block">
+            stl / obj / glb / ply
+          </span>
         </div>
         <div className="h-px w-full bg-gradient-to-r from-amber-500/60 via-teal-400/40 to-transparent" />
       </header>

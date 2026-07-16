@@ -1,5 +1,7 @@
 'use client';
 
+import { RulerIcon } from './icons';
+
 const MM_TO_INCH = 1 / 25.4;
 
 interface MeasureOverlayProps {
@@ -25,13 +27,13 @@ export default function MeasureOverlay({
     <div className="absolute top-4 left-4 flex flex-col items-start gap-2">
       <button
         onClick={onToggle}
-        className={`rounded-lg border px-3 py-2 text-xs font-medium backdrop-blur-sm transition-colors ${
+        className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium backdrop-blur-sm transition-colors ${
           active
             ? 'border-blue-400 bg-blue-500/20 text-blue-100'
             : 'border-slate-700 bg-slate-900/80 text-slate-300 hover:border-slate-500'
         }`}
       >
-        📏 Mål avstand
+        <RulerIcon className="h-3.5 w-3.5" /> Mål avstand
       </button>
 
       {active && (

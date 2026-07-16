@@ -1,51 +1,54 @@
+import {
+  CutIcon,
+  EngraveIcon,
+  MoldIcon,
+  OptimizeIcon,
+  RepairIcon,
+  RulerIcon,
+  ShellIcon,
+  ThicknessIcon,
+} from './icons';
+
 const TOOLS = [
   {
-    icon: '📐',
+    icon: RulerIcon,
     title: 'Måling og skalering',
     description: 'Mål avstander direkte på modellen og skaler til nøyaktig ønsket størrelse i mm eller tommer.',
-    status: 'Klart',
   },
   {
-    icon: '🐚',
+    icon: ShellIcon,
     title: 'Hul-gjøring (shell)',
     description: 'Gjør en solid modell hul med valgfri veggtykkelse for å spare filament eller harpiks.',
-    status: 'Klart',
   },
   {
-    icon: '🩹',
+    icon: RepairIcon,
     title: 'Mesh-reparasjon',
     description: 'Finn og tett hull i modellen automatisk, og få varsel om ikke-manifold kanter.',
-    status: 'Klart',
   },
   {
-    icon: '✨',
+    icon: OptimizeIcon,
     title: 'Optimalisering',
     description: 'Forenkle tunge AI-genererte modeller, fjern løse fragmenter og glatt ut overflater.',
-    status: 'Klart',
   },
   {
-    icon: '🧊',
+    icon: MoldIcon,
     title: 'Mold-generator',
     description: 'Automatisk todelt støpeform med hellekanal, styrelåser, strikk-spor og A/B-merking.',
-    status: 'Klart',
   },
   {
-    icon: '🔪',
+    icon: CutIcon,
     title: 'Plan-kutt',
     description: 'Del modellen i to langs et plan for å printe store modeller i deler.',
-    status: 'Klart',
   },
   {
-    icon: '🔤',
+    icon: EngraveIcon,
     title: 'Gravering',
     description: 'Gravér eller preg tekst på modellen – navn, delenummer eller merking.',
-    status: 'Klart',
   },
   {
-    icon: '📏',
+    icon: ThicknessIcon,
     title: 'Veggtykkelse',
     description: 'Fargekart som avslører områder som er for tynne for print eller støp.',
-    status: 'Klart',
   },
 ] as const;
 
@@ -59,30 +62,23 @@ export default function RoadmapSection() {
         Alt du trenger fra modell til støpeform
       </h2>
       <p className="mt-2 max-w-2xl text-sm text-slate-400">
-        3D-viseren er fundamentet. Dette er status på verktøyene som gjør dette til en
-        fullverdig erstatning for MoldBoxer og Meshcast.
+        Alle verktøyene kjører direkte i nettleseren – modellen din lastes aldri opp til
+        noen server.
       </p>
 
-      <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {TOOLS.map((tool, index) => (
           <div key={tool.title} className="tcard p-5">
             <div className="flex items-center justify-between">
-              <span className="text-2xl">{tool.icon}</span>
+              <span className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-700 text-slate-300">
+                <tool.icon className="h-5 w-5" />
+              </span>
               <span className="font-mono text-[10px] text-slate-600">
                 {String(index + 1).padStart(2, '0')}
               </span>
             </div>
             <h3 className="tlabel mt-3">{tool.title}</h3>
             <p className="mt-1.5 text-xs leading-relaxed text-slate-400">{tool.description}</p>
-            <span
-              className={`mt-3 inline-block rounded-full px-2 py-0.5 font-mono text-[10px] tracking-wide uppercase ${
-                tool.status === 'Klart'
-                  ? 'bg-emerald-500/10 text-emerald-300'
-                  : 'bg-slate-800 text-slate-400'
-              }`}
-            >
-              {tool.status}
-            </span>
           </div>
         ))}
       </div>

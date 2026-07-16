@@ -1,8 +1,10 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
+import { UploadIcon } from './icons';
 
 const ACCEPTED_EXTENSIONS = ['.stl', '.obj', '.glb', '.gltf', '.ply'];
+const FORMAT_LABELS = ['STL', 'OBJ', 'GLB', 'PLY'];
 
 interface UploadZoneProps {
   onFile: (file: File) => void;
@@ -55,11 +57,20 @@ export default function UploadZone({ onFile, isLoading, error }: UploadZoneProps
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}
         />
-        <div className="text-4xl">📦</div>
+        <span className="flex h-12 w-12 items-center justify-center rounded-lg border border-slate-600 text-slate-300">
+          <UploadIcon className="h-6 w-6" />
+        </span>
         <p className="text-lg font-medium text-slate-100">
-          {isLoading ? 'Leser modell…' : 'Slipp en 3D-fil her (STL, OBJ, GLB, PLY)'}
+          {isLoading ? 'Leser modell…' : 'Slipp en 3D-fil her'}
         </p>
         <p className="text-sm text-slate-400">eller klikk for å velge en fil fra maskinen din</p>
+        <div className="mt-1 flex gap-1.5 font-mono text-[10px] tracking-wide text-slate-500">
+          {FORMAT_LABELS.map((format) => (
+            <span key={format} className="rounded border border-slate-700 px-1.5 py-0.5">
+              {format}
+            </span>
+          ))}
+        </div>
         {error && <p className="text-sm text-red-400">{error}</p>}
       </div>
     </div>
