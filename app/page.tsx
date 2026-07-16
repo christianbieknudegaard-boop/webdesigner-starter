@@ -311,6 +311,26 @@ export default function Home() {
     [applyTransform]
   );
 
+  const handleRotateDegrees = useCallback(
+    (axis: RotateAxis, degrees: number) => {
+      const radians = THREE.MathUtils.degToRad(degrees);
+      applyTransform((geometry) => {
+        if (axis === 'x') geometry.rotateX(radians);
+        else if (axis === 'y') geometry.rotateY(radians);
+        else geometry.rotateZ(radians);
+      });
+    },
+    [applyTransform]
+  );
+
+  const handleScaleAxes = useCallback(
+    (fx: number, fy: number, fz: number) => {
+      if (!(fx > 0) || !(fy > 0) || !(fz > 0)) return;
+      applyTransform((geometry) => geometry.scale(fx, fy, fz));
+    },
+    [applyTransform]
+  );
+
   const handleMirror = useCallback(() => {
     applyTransform((geometry) => {
       geometry.scale(-1, 1, 1);
@@ -574,6 +594,70 @@ export default function Home() {
       setOrientBusy(false);
     }
   }, [baseGeometry, stats, applyTransform]);
+
+  const [flattenBusy, setFlattenBusy] = useState(false);
+  const [flattenError, setFlattenError] = useState<string | null>(null);
+
+  /** Cuts away everything below `heightInUnit` above the model's lowest
+   *  point (along the native up axis), leaving a flat base. */
+  const handleFlatten = useCallback(
+    async (heightInUnit: number) => {
+      if (!baseGeometry || !stats || !(heightInUnit > 0)) return;
+      setFlattenBusy(true);
+      setFlattenError(null);
+      const token = ++analysisToken.current;
+      try {
+        const upAxis = formatUpAxis(stats.format);
+        const heightNative =
+          (unit === 'in' ? heightInUnit / MM_TO_INCH : heightInUnit) / scale;
+        baseGeometry.computeBoundingBox();
+        const box = baseGeometry.boundingBox!;
+        const axisIndex = { x: 0, y: 1, z: 2 }[upAxis] as 0 | 1 | 2;
+        const span = box.max.getComponent(axisIndex) - box.min.getComponent(axisIndex);
+        if (heightNative >= span) {
+          throw new Error('Kuttnivået er høyere enn hele modellen.');
+        }
+        const coord = box.min.getComponent(axisIndex) + heightNative;
+        // Reuse the plane-cut CSG; half A is the +side, i.e. everything above.
+        const result = await cutInWorker(baseGeometry, upAxis, coord, false);
+        if (analysisToken.current !== token) return;
+        const kept = result.halfA;
+        rememberForUndo(baseGeometry, stats, health);
+        kept.computeBoundingBox();
+        const size = kept.boundingBox!.getSize(new THREE.Vector3());
+        const triangleCount = kept.index
+          ? kept.index.count / 3
+          : kept.attributes.position.count / 3;
+        setBaseGeometry(kept);
+        setStats((prev) =>
+          prev
+            ? {
+                ...prev,
+                triangleCount: Math.round(triangleCount),
+                vertexCount: kept.attributes.position.count,
+                dimensions: { x: size.x, y: size.y, z: size.z },
+              }
+            : prev
+        );
+        setHealth(null);
+        analyzeMeshInWorker(kept)
+          .then((report) => {
+            if (analysisToken.current === token) setHealth(report);
+          })
+          .catch(() => {});
+        resetShellState();
+        resetMoldState();
+        setMeasurePoints([]);
+      } catch (err) {
+        if (analysisToken.current === token) {
+          setFlattenError(err instanceof Error ? err.message : 'Kuttet feilet.');
+        }
+      } finally {
+        setFlattenBusy(false);
+      }
+    },
+    [baseGeometry, stats, unit, scale, health, rememberForUndo, resetShellState, resetMoldState]
+  );
 
   const handleUploadSecond = useCallback(
     async (file: File) => {
@@ -1065,12 +1149,18 @@ export default function Home() {
                 )}
                 <TransformPanel
                   supported={singleMesh !== null}
+                  unit={unit}
                   orientBusy={orientBusy}
                   orientStatus={orientStatus}
+                  flattenBusy={flattenBusy}
+                  flattenError={flattenError}
                   onRotate={handleRotate}
+                  onRotateDegrees={handleRotateDegrees}
+                  onScaleAxes={handleScaleAxes}
                   onMirror={handleMirror}
                   onLayFlat={handleLayFlat}
                   onAutoOrient={handleAutoOrient}
+                  onFlatten={handleFlatten}
                 />
                 <RepairPanel
                   supported={singleMesh !== null}

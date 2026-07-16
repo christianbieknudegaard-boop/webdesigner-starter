@@ -6,7 +6,7 @@ verktøy som [MoldBoxer](https://moldboxer.com/) og [Meshcast](https://meshcast.
 ## 🚀 Funksjoner
 
 - **3D-viewer**: Dra-og-slipp STL-, OBJ-, GLB/GLTF- og PLY-filer (GLB er formatet de fleste AI bilde-til-3D-tjenester leverer)
-- **Orientering**: Rotér 90°, speil, legg største flate ned – eller auto-orienter for minst mulig printstøtte
+- **Orientering og justering**: Rotér 90° eller vilkårlige grader, speil, legg største flate ned, auto-orienter for minst printstøtte, strekk/klem per akse, og kutt flat bunn for godt printfeste
 - **Volum og vekt**: Volum i cm³ med vektestimat per materiale (PLA/PETG/ABS/resin/silikon/gips)
 - **Optimalisering**: Forenkle tunge AI-modeller (meshoptimizer), fjern løse fragmenter, glatt ut overflater
 - **Plan-kutt**: Del modellen i to vanntette deler for utskrift i biter
