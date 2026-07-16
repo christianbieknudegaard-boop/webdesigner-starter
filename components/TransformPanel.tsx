@@ -1,5 +1,7 @@
 'use client';
 
+import { RotateIcon } from './icons';
+
 export type RotateAxis = 'x' | 'y' | 'z';
 
 interface TransformPanelProps {
@@ -34,9 +36,9 @@ export default function TransformPanel({
               <button
                 key={axis}
                 onClick={() => onRotate(axis)}
-                className="rounded-md border border-slate-600 py-1.5 text-xs text-slate-200 hover:border-slate-400"
+                className="flex items-center justify-center gap-1 rounded-md border border-slate-600 py-1.5 text-xs text-slate-200 hover:border-slate-400"
               >
-                ⟳ {axis.toUpperCase()} 90°
+                <RotateIcon className="h-3 w-3" /> {axis.toUpperCase()} 90°
               </button>
             ))}
           </div>

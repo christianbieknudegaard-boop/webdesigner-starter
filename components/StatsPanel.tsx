@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { ModelStats } from '@/types/model';
+import { UndoIcon } from './icons';
 
 const MM_TO_INCH = 1 / 25.4;
 const MIN_BASE_DIMENSION = 0.001;
@@ -171,9 +172,9 @@ export default function StatsPanel({
         <button
           onClick={onUndo}
           disabled={!canUndo}
-          className="w-full rounded-md border border-slate-600 py-1.5 text-xs text-slate-300 hover:border-slate-400 disabled:opacity-40"
+          className="flex w-full items-center justify-center gap-1.5 rounded-md border border-slate-600 py-1.5 text-xs text-slate-300 hover:border-slate-400 disabled:opacity-40"
         >
-          ↩ Angre siste endring
+          <UndoIcon className="h-3.5 w-3.5" /> Angre siste endring
         </button>
         <button
           onClick={onReset}
